@@ -618,7 +618,7 @@ Function Import-WimInfo($IndexNumber, [switch]$SkipUserConfirmation) {
 }
 
 #Function to Select JSON File
-Function SelectJSONFile {
+Function Select-JSONFile {
 
     $JSON = New-Object System.Windows.Forms.OpenFileDialog -Property @{
         InitialDirectory = [Environment]::GetFolderPath('Desktop')
@@ -653,7 +653,7 @@ Function Invoke-ParseJSON($file) {
 }
 
 #Function to select the paths for the driver fields
-Function SelectDriverSource($DriverTextBoxNumber) {
+Function Select-DriverSource($DriverTextBoxNumber) {
     Add-Type -AssemblyName System.Windows.Forms
     $browser = New-Object System.Windows.Forms.FolderBrowserDialog
     $browser.Description = 'Select the Driver Source folder'
@@ -1089,7 +1089,7 @@ Function Invoke-MakeItSo ($appx) {
 }
 
 #Function to assign the target directory
-Function SelectTargetDir {
+Function Select-TargetDir {
 
     Add-Type -AssemblyName System.Windows.Forms
 
@@ -2794,8 +2794,42 @@ Function Reset-MISCheckBox {
 Function Invoke-RunConfigFile($filename) {
     Update-Log -Data "Loading the config file: $filename" -Class Information
     Get-Configuration -filename $filename
-    Update-Log -Datversion $WWScriptVer"
-    Write-Output " '
+    Update-Log -Datversion $WWScriptVer
+    Write-Output ' '
+    Write-Output '##########################################################'
+    Write-Output ' '
+}
+
+function Show-ClosingText {
+    #Before you start bitching about write-host, write-output doesn't work with the exiting function. Suggestions are welcome.
+    Write-Host ' '
+    Write-Host '##########################################################'
+    Write-Host ' '
+    Write-Host 'Thank you for using WIM Witch. If you have any questions,'
+    Write-Host 'comments, or suggestions, please reach out to me!'
+    Write-Host ' '
+    Write-Host '-Donna Ryan'
+    Write-Host ' '
+    Write-Host 'twitter: @TheNotoriousDRR'
+    Write-Host 'www.MSEndpointmgr.com'
+    Write-Host 'www.TheNotoriousDRR.com'
+    Write-Host ' '
+    Write-Host '##########################################################'
+    if ($HiHungryImDad -eq $true) {
+        Write-Host ' '
+        Write-Host (invoke-dadjoke)
+        Write-Host ' '
+        Write-Host '##########################################################'
+    }
+}
+
+function Show-OpeningText {
+    Clear-Host
+    Write-Output '##########################################################'
+    Write-Output ' '
+    Write-Output '             ***** Starting WIM Witch *****'
+    Write-Output "                      version $WWScriptVer"
+    Write-Output ' '
     Write-Output '##########################################################'
     Write-Output ' '
 }
@@ -7627,17 +7661,17 @@ $WPFMISMountSelectButton.Add_Click( { SelectMountdir })
 $WPFSourceWIMSelectButton.Add_Click( { Select-SourceWIM })
 
 #JSON File selection Button
-$WPFJSONButton.Add_Click( { SelectJSONFile })
+$WPFJSONButton.Add_Click( { Select-JSONFile })
 
 #Target Folder selection Button
-$WPFMISFolderButton.Add_Click( { SelectTargetDir })
+$WPFMISFolderButton.Add_Click( { Select-TargetDir })
 
 #Driver Directory Buttons
-$WPFDriverDir1Button.Add_Click( { SelectDriverSource -DriverTextBoxNumber $WPFDriverDir1TextBox })
-$WPFDriverDir2Button.Add_Click( { SelectDriverSource -DriverTextBoxNumber $WPFDriverDir2TextBox })
-$WPFDriverDir3Button.Add_Click( { SelectDriverSource -DriverTextBoxNumber $WPFDriverDir3TextBox })
-$WPFDriverDir4Button.Add_Click( { SelectDriverSource -DriverTextBoxNumber $WPFDriverDir4TextBox })
-$WPFDriverDir5Button.Add_Click( { SelectDriverSource -DriverTextBoxNumber $WPFDriverDir5TextBox })
+$WPFDriverDir1Button.Add_Click( { Select-DriverSource -DriverTextBoxNumber $WPFDriverDir1TextBox })
+$WPFDriverDir2Button.Add_Click( { Select-DriverSource -DriverTextBoxNumber $WPFDriverDir2TextBox })
+$WPFDriverDir3Button.Add_Click( { Select-DriverSource -DriverTextBoxNumber $WPFDriverDir3TextBox })
+$WPFDriverDir4Button.Add_Click( { Select-DriverSource -DriverTextBoxNumber $WPFDriverDir4TextBox })
+$WPFDriverDir5Button.Add_Click( { Select-DriverSource -DriverTextBoxNumber $WPFDriverDir5TextBox })
 
 #Make it So Button, which builds the WIM file
 $WPFMISMakeItSoButton.Add_Click( { Invoke-MakeItSo -appx $global:SelectedAppx })
