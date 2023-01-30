@@ -199,7 +199,7 @@ Param(
 
 $WWScriptVer = '3.4.6'
 
-#Your XAML goes here :)
+#Your XAML goes here
 $inputXML = @"
 <Window x:Class="WIM_Witch_Tabbed.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -685,13 +685,13 @@ Function Invoke-MakeItSo ($appx) {
 
 
     #check for working directory, make if does not exist, delete files if they exist
-    $FolderExist = Test-Path $PSScriptRoot\Staging -PathType Any
+    $FolderExist = Test-Path "$PSScriptRoot\Staging" -PathType 'Any'
     Update-Log -Data 'Checking to see if the staging path exists...' -Class Information
 
     try {
         if ($FolderExist = $False) {
             New-Item -ItemType Directory -Force -Path $PSScriptRoot\Staging -ErrorAction Stop
-            Update-Log -Data 'Path did not exist, but it does now :)' -Class Information -ErrorAction Stop
+            Update-Log -Data 'Path did not exist, but it does now' -Class Information -ErrorAction Stop
         } Else {
             Remove-Item –Path $PSScriptRoot\Staging\* -Recurse -ErrorAction Stop
             Update-Log -Data 'The path existed, and it has been purged.' -Class Information -ErrorAction Stop
@@ -848,7 +848,6 @@ Function Invoke-MakeItSo ($appx) {
             Update-Log -Data 'of Windows has been selected' -Class Error
             Update-log -Data "The WIM is still mounted. You'll need to clean that up manually until" -Class Error
             Update-Log -data 'I get around to handling that error more betterer' -Class Error
-            Update-Log -data '- <3 Donna' -Class Error
             return
         }
 
