@@ -648,7 +648,6 @@ Function Invoke-ParseJSON($file) {
         $WPFComment_File.text = 'Bad file. Try Again.'
         Update-Log -Data 'Failed to parse JSON file. Try another'
         return
-
     }
 }
 
@@ -665,7 +664,6 @@ Function Select-DriverSource($DriverTextBoxNumber) {
 
 #Function for the Make it So button
 Function Invoke-MakeItSo ($appx) {
-
     #Check if new file name is valid, also append file extension if neccessary
 
     ###Starting MIS Preflight###
@@ -685,11 +683,10 @@ Function Invoke-MakeItSo ($appx) {
 
 
     #check for working directory, make if does not exist, delete files if they exist
-    $FolderExist = Test-Path "$PSScriptRoot\Staging" -PathType 'Any'
     Update-Log -Data 'Checking to see if the staging path exists...' -Class Information
 
     try {
-        if ($FolderExist = $False) {
+        if (!(Test-Path "$PSScriptRoot\Staging" -PathType 'Any')) {
             New-Item -ItemType Directory -Force -Path $PSScriptRoot\Staging -ErrorAction Stop
             Update-Log -Data 'Path did not exist, but it does now' -Class Information -ErrorAction Stop
         } Else {
@@ -714,7 +711,6 @@ Function Invoke-MakeItSo ($appx) {
     }
 
     if ($WPFMISDotNetCheckBox.IsChecked -eq $true) {
-        #ping
         if ((Test-DotNetExists) -eq $False) { return }
     }
 
@@ -760,7 +756,6 @@ Function Invoke-MakeItSo ($appx) {
     Remove-OSIndex
 
     #Mount the WIM File
-
     $wimname = Get-Item -Path $PSScriptRoot\Staging\*.wim
     Update-Log -Data "Mounting source WIM $wimname" -Class Information
     Update-Log -Data 'to mount point:' -Class Information
@@ -810,7 +805,6 @@ Function Invoke-MakeItSo ($appx) {
         Update-Log -data 'Script completed.' -Class Information
     }
 
-
     #Language Packs and FOD
     if ($WPFCustomCBLangPacks.IsChecked -eq $true) {
         Install-LanguagePacks
@@ -830,15 +824,12 @@ Function Invoke-MakeItSo ($appx) {
         Update-Log -Data 'Features On Demand not selected. Skipping...'
     }
 
-
     #Inject .Net Binaries
     if ($WPFMISDotNetCheckBox.IsChecked -eq $true) { Add-DotNet }
 
     #Inject Autopilot JSON file
     if ($WPFJSONEnableCheckBox.IsChecked -eq $true) {
-
         Update-Log -Data 'Injecting JSON file' -Class Information
-
         try {
             $autopilotdir = $WPFMISMountTextBox.Text + '\windows\Provisioning\Autopilot'
             Copy-Item $WPFJSONTextBox.Text -Destination $autopilotdir -ErrorAction Stop
@@ -850,15 +841,12 @@ Function Invoke-MakeItSo ($appx) {
             Update-Log -data 'I get around to handling that error more betterer' -Class Error
             return
         }
-
     } else {
         Update-Log -Data 'JSON not selected. Skipping JSON Injection' -Class Information
     }
 
     #Inject Drivers
-
     If ($WPFDriverCheckBox.IsChecked -eq $true) {
-
         Start-DriverInjection -Folder $WPFDriverDir1TextBox.text
         Start-DriverInjection -Folder $WPFDriverDir2TextBox.text
         Start-DriverInjection -Folder $WPFDriverDir3TextBox.text
@@ -869,20 +857,23 @@ Function Invoke-MakeItSo ($appx) {
     }
 
     #Inject default application association XML
-    if ($WPFCustomCBEnableApp.IsChecked -eq $true) { Install-DefaultApplicationAssociations }
-    else {
+    if ($WPFCustomCBEnableApp.IsChecked -eq $true) {
+        Install-DefaultApplicationAssociations
+    } else {
         Update-Log -Data 'Default Application Association not selected. Skipping...' -Class Information
     }
 
     #Inject start menu layout
-    if ($WPFCustomCBEnableStart.IsChecked -eq $true) { Install-StartLayout }
-    else {
+    if ($WPFCustomCBEnableStart.IsChecked -eq $true) {
+        Install-StartLayout
+    } else {
         Update-Log -Data 'Start Menu Layout injection not selected. Skipping...' -Class Information
     }
 
     #apply registry files
-    if ($WPFCustomCBEnableRegistry.IsChecked -eq $true) { Install-RegistryFiles }
-    else {
+    if ($WPFCustomCBEnableRegistry.IsChecked -eq $true) {
+        Install-RegistryFiles
+    } else {
         Update-Log -Data 'Registry file injection not selected. Skipping...' -Class Information
     }
 
@@ -892,38 +883,39 @@ Function Invoke-MakeItSo ($appx) {
         if (($WPFSourceWIMImgDesTextBox.text -like '*Windows 10*') -or ($WPFSourceWIMImgDesTextBox.text -like '*Windows 11*')) { Get-OneDrive }
     }
 
-
-
     #Apply Updates
     If ($WPFUpdatesEnableCheckBox.IsChecked -eq $true) {
-
         Deploy-Updates -class 'SSU'
         Deploy-Updates -class 'LCU'
         Deploy-Updates -class 'AdobeSU'
         Deploy-Updates -class 'DotNet'
         Deploy-Updates -class 'DotNetCU'
         #if ($WPFUpdatesCBEnableDynamic.IsChecked -eq $True){Deploy-Updates -class "Dynamic"}
-        if ($WPFUpdatesOptionalEnableCheckBox.IsChecked -eq $True) { Deploy-Updates -class 'Optional' }
-
-    } Else {
+        if ($WPFUpdatesOptionalEnableCheckBox.IsChecked -eq $True) {
+            Deploy-Updates -class 'Optional'
+        }
+    } else {
         Update-Log -Data 'Updates not enabled' -Class Information
     }
 
     #Copy the current OneDrive installer
     if ($WPFMISOneDriveCheckBox.IsChecked -eq $true) {
-
         $os = Get-WindowsType
         $build = Get-WinVersionNumber
 
-        if (($os -eq 'Windows 11') -and ($build -eq '22H2')) { Copy-OneDrivex64 }
-        else { Copy-OneDrive }
+        if (($os -eq 'Windows 11') -and ($build -eq '22H2')) {
+            Copy-OneDrivex64
+        } else {
+            Copy-OneDrive
+        }
     } else {
         Update-Log -data 'OneDrive agent update skipped as it was not selected' -Class Information
     }
 
     #Remove AppX Packages
-    if ($WPFAppxCheckBox.IsChecked -eq $true) { Remove-Appx -array $appx }
-    Else {
+    if ($WPFAppxCheckBox.IsChecked -eq $true) {
+        Remove-Appx -array $appx
+    } Else {
         Update-Log -Data 'App removal not enabled' -Class Information
     }
 
@@ -959,7 +951,6 @@ Function Invoke-MakeItSo ($appx) {
     }
 
     #Dismount, commit, and move WIM
-
     Update-Log -Data 'Dismounting WIM file, committing changes' -Class Information
     try {
         Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Save -ErrorAction Stop | Out-Null
@@ -969,15 +960,12 @@ Function Invoke-MakeItSo ($appx) {
         Update-Log -data 'mounted image manually' -Class Error
         return
     }
-
     Update-Log -Data 'WIM dismounted' -Class Information
 
     #Display new version number
-
     $WimInfo = (Get-WindowsImage -ImagePath $wimname -Index 1)
     $text = 'New image version number is ' + $WimInfo.Version
     Update-Log -data $text -Class Information
-    #     }
 
     if (($auto -eq $true) -or ($WPFCMCBImageType.SelectedItem -eq 'Update Existing Image')) {
         Update-Log -Data 'Backing up old WIM file...' -Class Information
@@ -993,7 +981,6 @@ Function Invoke-MakeItSo ($appx) {
     }
 
     #Export the wim file to various locations
-    # if ($WPFMISCBNoWIM.IsChecked -eq $false){
     if ($WPFMISCBNoWIM.IsChecked -ne $true) {
         try {
             Update-Log -Data 'Exporting WIM file' -Class Information
@@ -1007,7 +994,7 @@ Function Invoke-MakeItSo ($appx) {
         Update-Log -Data 'WIM successfully exported to target folder' -Class Information
     }
 
-    #ConfigMgr Itegration
+    #ConfigMgr Integration
     if ($WPFCMCBImageType.SelectedItem -ne 'Disabled') {
         #  "New Image","Update Existing Image"
         if ($WPFCMCBImageType.SelectedItem -eq 'New Image') {
@@ -1019,30 +1006,33 @@ Function Invoke-MakeItSo ($appx) {
             Update-Log -data 'Updating the existing image in ConfigMgr...' -class Information
             Update-CMImage
         }
-
     }
 
     #Apply Dynamic Update to media
-    if ($WPFMISCBDynamicUpdates.IsChecked -eq $true) { Deploy-Updates -class 'Dynamic' }
-    else {
+    if ($WPFMISCBDynamicUpdates.IsChecked -eq $true) {
+        Deploy-Updates -class 'Dynamic'
+    } else {
         Update-Log -data 'Dynamic Updates skipped or not applicable' -Class Information
     }
 
     #Apply updates to the boot.wim file
-    if ($WPFMISCBBootWIM.IsChecked -eq $true) { Update-BootWIM }
-    else {
+    if ($WPFMISCBBootWIM.IsChecked -eq $true) {
+        Update-BootWIM
+    } else {
         Update-Log -data 'Updating Boot.WIM skipped or not applicable' -Class Information
     }
 
     #Copy upgrade package binaries if selected
-    if ($WPFMISCBUpgradePackage.IsChecked -eq $true) { Copy-UpgradePackage }
-    else {
+    if ($WPFMISCBUpgradePackage.IsChecked -eq $true) {
+        Copy-UpgradePackage
+    } else {
         Update-Log -Data 'Upgrade Package skipped or not applicable' -Class Information
     }
 
     #Create ISO if selected
-    if ($WPFMISCBISO.IsChecked -eq $true) { New-WindowsISO }
-    else {
+    if ($WPFMISCBISO.IsChecked -eq $true) {
+        New-WindowsISO
+    } else {
         Update-Log -Data 'ISO Creation skipped or not applicable' -Class Information
     }
 
@@ -1050,7 +1040,6 @@ Function Invoke-MakeItSo ($appx) {
     if (($WPFCustomCBRunScript.IsChecked -eq $True) -and ($WPFCustomCBScriptTiming.SelectedItem -eq 'On build completion')) {
         Start-Script -file $WPFCustomTBFile.text -parameter $WPFCustomTBParameters.text
     }
-
 
     #Clear out staging folder
     try {
@@ -1073,9 +1062,7 @@ Function Invoke-MakeItSo ($appx) {
             Rename-Name -file $lognew -extension '.log'
         }
 
-
         #Put log detection code here
-
         Rename-Item $logold -NewName $lognew -Force -ErrorAction Stop
         Update-Log -Data 'Log copied successfully' -Class Information
     } catch {
@@ -1089,14 +1076,11 @@ Function Invoke-MakeItSo ($appx) {
 
 #Function to assign the target directory
 Function Select-TargetDir {
-
     Add-Type -AssemblyName System.Windows.Forms
-
     $browser = New-Object System.Windows.Forms.FolderBrowserDialog
     $browser.Description = 'Select the target folder'
     $null = $browser.ShowDialog()
     $TargetDir = $browser.SelectedPath
-
     $WPFMISWimFolderTextBox.text = $TargetDir #I SCREWED UP THIS VARIABLE
     Update-Log -Data 'Target directory selected' -Class Information
 }
@@ -1159,17 +1143,13 @@ Function Update-Log {
 
 #Removes old log and creates all folders if does not exist
 Function Set-Logging {
-
     #logging folder
-    $FileExist = Test-Path -Path $PSScriptRoot\logging\WIMWitch.Log -PathType Leaf
-    if ($FileExist -eq $False) {
+    if (!(Test-Path -Path $PSScriptRoot\logging\WIMWitch.Log -PathType Leaf)) {
         New-Item -ItemType Directory -Force -Path $PSScriptRoot\Logging | Out-Null
         New-Item -Path $PSScriptRoot\logging -Name 'WIMWitch.log' -ItemType 'file' -Value '***Logging Started***' | Out-Null
-
     } Else {
         Remove-Item -Path $PSScriptRoot\logging\WIMWitch.log
         New-Item -Path $PSScriptRoot\logging -Name 'WIMWitch.log' -ItemType 'file' -Value '***Logging Started***' | Out-Null
-
     }
 
 
