@@ -1568,27 +1568,47 @@ Function Update-PatchSource {
     Update-Log -Data 'attempting to start download Function' -Class Information
     if ($WPFUSCBSelectCatalogSource.SelectedItem -eq 'OSDSUS') {
         if ($WPFUpdatesW10Main.IsChecked -eq $true) {
-
-            $supportedBuilds = @(
-                @{Build = '22H2'; OS = 'Windows 10' },
-                @{Build = '21H2'; OS = 'Windows 10' },
-                @{Build = '21H1'; OS = 'Windows 10' },
-                @{Build = '20H2'; OS = 'Windows 10' },
-                @{Build = '2004'; OS = 'Windows 10' },
-                @{Build = '1909'; OS = 'Windows 10' },
-                @{Build = '1903'; OS = 'Windows 10' },
-                @{Build = '1809'; OS = 'Windows 10' },
-                @{Build = '1803'; OS = 'Windows 10' },
-                @{Build = '1709'; OS = 'Windows 10' }
-            )
-
-            foreach ($build in $supportedBuilds) {
-                if ($('WPFUpdatesW10_' + $build.Build).IsChecked -eq $true) {
-                    Test-Superceded -action delete -build $build.Build -OS $build.OS
-                    Get-WindowsPatches -build $build.Build -OS $build.OS
-                }
+            if ($WPFUpdatesW10_22H2.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 22H2 -OS 'Windows 10'
+                Get-WindowsPatches -build 22H2 -OS 'Windows 10'
             }
-
+            if ($WPFUpdatesW10_21H2.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 21H2 -OS 'Windows 10'
+                Get-WindowsPatches -build 21H2 -OS 'Windows 10'
+            }
+            if ($WPFUpdatesW10_21H1.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 21H1 -OS 'Windows 10'
+                Get-WindowsPatches -build 21H1 -OS 'Windows 10'
+            }
+            if ($WPFUpdatesW10_20H2.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 20H2 -OS 'Windows 10'
+                Get-WindowsPatches -build 20H2 -OS 'Windows 10'
+            }
+            if ($WPFUpdatesW10_2004.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 2004 -OS 'Windows 10'
+                Get-WindowsPatches -build 2004 -OS 'Windows 10'
+            }
+            if ($WPFUpdatesW10_1909.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 1909 -OS 'Windows 10'
+                Get-WindowsPatches -build 1909 -OS 'Windows 10'
+            }
+            if ($WPFUpdatesW10_1903.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 1903 -OS 'Windows 10'
+                Get-WindowsPatches -build 1903 -OS 'Windows 10'
+            }
+            if ($WPFUpdatesW10_1809.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 1809 -OS 'Windows 10'
+                Get-WindowsPatches -build 1809 -OS 'Windows 10'
+            }
+            if ($WPFUpdatesW10_1803.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 1803 -OS 'Windows 10'
+                Get-WindowsPatches -build 1803 -OS 'Windows 10'
+            }
+            if ($WPFUpdatesW10_1709.IsChecked -eq $true) {
+                Test-Superceded -action delete -build 1709 -OS 'Windows 10'
+                Get-WindowsPatches -build 1709 -OS 'Windows 10'
+            }
+            #Get-OneDrive
         }
         if ($WPFUpdatesS2019.IsChecked -eq $true) {
             Test-Superceded -action delete -build 1809 -OS 'Windows Server'
@@ -1605,15 +1625,16 @@ Function Update-PatchSource {
 
         if ($WPFUpdatesW11Main.IsChecked -eq $true) {
 
-            $supportedBuilds = @(
-                @{Build = '22H2'; OS = 'Windows 11' },
-                @{Build = '21H2'; OS = 'Windows 11' }
-            )
-            foreach ($build in $supportedBuilds) {
-                if ($('WPFUpdatesW11_' + $build.Build).IsChecked -eq $true) {
-                    Test-Superceded -action delete -build $build.Build -OS $build.OS
-                    Get-WindowsPatches -build $build.Build -OS $build.OS
-                }
+            if ($WPFUpdatesW11_22H2.IsChecked -eq $true) {
+
+                Test-Superceded -action delete -build 22H2 -OS 'Windows 11'
+                Get-WindowsPatches -build 22H2 -OS 'Windows 11'
+            }
+            if ($WPFUpdatesW11_21h2.IsChecked -eq $true) {
+                Write-Host '21H2'
+                Test-Superceded -action delete -build 21H2 -OS 'Windows 11'
+                Get-WindowsPatches -build 21H2 -OS 'Windows 11'
+
             }
 
         }
@@ -1622,26 +1643,47 @@ Function Update-PatchSource {
 
     if ($WPFUSCBSelectCatalogSource.SelectedItem -eq 'ConfigMgr') {
         if ($WPFUpdatesW10Main.IsChecked -eq $true) {
-
-            $supportedBuilds = @(
-                @{Build = '22H2'; OS = 'Windows 10' },
-                @{Build = '21H2'; OS = 'Windows 10' },
-                @{Build = '21H1'; OS = 'Windows 10' },
-                @{Build = '20H2'; OS = 'Windows 10' },
-                @{Build = '2004'; OS = 'Windows 10' },
-                @{Build = '1909'; OS = 'Windows 10' },
-                @{Build = '1903'; OS = 'Windows 10' },
-                @{Build = '1809'; OS = 'Windows 10' },
-                @{Build = '1803'; OS = 'Windows 10' },
-                @{Build = '1709'; OS = 'Windows 10' }
-            )
-
-            foreach ($build in $supportedBuilds) {
-                if ($('WPFUpdatesW10_' + $build.Build).IsChecked -eq $true) {
-                    Invoke-MEMCMUpdateSupersedence -prod $build.OS -ver $build.build
-                    Invoke-MEMCMUpdateCatalog -prod $build.OS -ver $build.build
-                }
+            if ($WPFUpdatesW10_22H2.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '22H2'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '22H2'
             }
+            if ($WPFUpdatesW10_21H2.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '21H2'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '21H2'
+            }
+            if ($WPFUpdatesW10_21H1.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '21H1'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '21H1'
+            }
+            if ($WPFUpdatesW10_20H2.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '20H2'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '20H2'
+            }
+            if ($WPFUpdatesW10_2004.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '2004'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '2004'
+            }
+            if ($WPFUpdatesW10_1909.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '1909'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '1909'
+            }
+            if ($WPFUpdatesW10_1903.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '1903'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '1903'
+            }
+            if ($WPFUpdatesW10_1809.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '1809'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '1809'
+            }
+            if ($WPFUpdatesW10_1803.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '1803'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '1803'
+            }
+            if ($WPFUpdatesW10_1709.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 10' -Ver '1709'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 10' -ver '1709'
+            }
+            #Get-OneDrive
         }
         if ($WPFUpdatesS2019.IsChecked -eq $true) {
             Invoke-MEMCMUpdateSupersedence -prod 'Windows Server' -Ver '1809'
@@ -1656,17 +1698,18 @@ Function Update-PatchSource {
             Invoke-MEMCMUpdatecatalog -prod 'Windows Server' -Ver '21H2'
         }
         if ($WPFUpdatesW11Main.IsChecked -eq $true) {
-
-            $supportedBuilds = @(
-                @{Build = '22H2'; OS = 'Windows 11' },
-                @{Build = '21H2'; OS = 'Windows 11' }
-            )
-            foreach ($build in $supportedBuilds) {
-                if ($('WPFUpdatesW11_' + $build.Build).IsChecked -eq $true) {
-                    Invoke-MEMCMUpdateSupersedence -prod $build.OS -ver $build.build
-                    Invoke-MEMCMUpdateCatalog -prod $build.OS -ver $build.build
-                }
+            if ($WPFUpdatesW11_21H2.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 11' -Ver '21H2'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 11' -ver '21H2'
             }
+            if ($WPFUpdatesW11_22H2.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 11' -Ver '22H2'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 11' -ver '22H2'
+            }
+
+            #Invoke-MEMCMUpdateSupersedence -prod "Windows 11" -Ver "21H2"
+            #Invoke-MEMCMUpdatecatalog -prod "Windows 11" -Ver "21H2"
+            #Get-OneDrive
         }
         Get-OneDrive
     }
