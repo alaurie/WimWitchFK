@@ -1259,7 +1259,7 @@ Function Get-OSDSUSInstallation {
     try {
         Import-Module -Name OSDSUS -ErrorAction Stop
     } catch {
-        $WPFUpdatesOSDSUSVersion.Text = Not Installed
+        $WPFUpdatesOSDSUSVersion.Text = 'Not Installed.'
         Update-Log -Data 'OSDSUS is not installed.' -Class Warning
         Return
     }
