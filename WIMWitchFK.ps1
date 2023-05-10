@@ -1313,6 +1313,7 @@ Function Get-OSDSUSInstallation {
     }
     catch {
         $WPFUpdatesOSDSUSVersion.Text = 'Not Installed'
+
         Update-Log -Data 'OSDSUS is not installed.' -Class Warning
         Return
     }
