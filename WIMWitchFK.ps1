@@ -6486,6 +6486,10 @@ Function Find-ConfigManager() {
         $siteservertext = 'Site Server - ' + $WPFCMTBSiteServer.text
         Update-Log -Data $siteservertext -Class Information
 
+        $global:SiteCode = $WPFCMTBSitecode.text
+        $global:SiteServer = $WPFCMTBSiteServer.Text
+        $global:CMDrive = $WPFCMTBSitecode.text + ':' 
+
         return 0
     }
 
