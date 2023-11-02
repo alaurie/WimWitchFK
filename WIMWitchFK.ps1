@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 3.4.7
+.VERSION 3.4.8
 
 .GUID ee1ba506-ac68-45f8-9f37-4555f1902353
 
@@ -36,6 +36,9 @@
  Image (WIM) files and ISOs. It can also create WIM configuration templates and
  apply them either with the GUI or programatically for bulk creation. WIM Witch
  works as a stand alone tool, as well as integrating with Configuration Manager
+
+-version 3.4.8
+Added appx removal for Windows 11 23H2 and added new Microsoft Backup to the list of apps to remove.
 
 -version 3.4.7
 Add Windows 11 23H2 support
@@ -211,7 +214,7 @@ Param(
 
 )
 
-$WWScriptVer = '3.4.7'
+$WWScriptVer = '3.4.8'
 
 #region XAML
 #Your XAML goes here
