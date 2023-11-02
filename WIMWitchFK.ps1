@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 3.4.7
+.VERSION 3.4.8
 
 .GUID ee1ba506-ac68-45f8-9f37-4555f1902353
 
@@ -36,6 +36,9 @@
  Image (WIM) files and ISOs. It can also create WIM configuration templates and
  apply them either with the GUI or programatically for bulk creation. WIM Witch
  works as a stand alone tool, as well as integrating with Configuration Manager
+
+-version 3.4.8
+Added appx removal for Windows 11 23H2 and added new Microsoft Backup to the list of apps to remove.
 
 -version 3.4.7
 Add Windows 11 23H2 support
@@ -211,7 +214,7 @@ Param(
 
 )
 
-$WWScriptVer = '3.4.7'
+$WWScriptVer = '3.4.8'
 
 #region XAML
 #Your XAML goes here
@@ -539,15 +542,12 @@ Function Get-FormVariables {
     Get-Variable WPF*
 }
 
-#Get-FormVariables
-
 #===========================================================================
 # Functions for Controls
 #===========================================================================
 
 #Function to select mounting directory
 Function Select-MountDir {
-
     Add-Type -AssemblyName System.Windows.Forms
     $browser = New-Object System.Windows.Forms.FolderBrowserDialog
     $browser.Description = 'Select the mount folder'
@@ -560,7 +560,6 @@ Function Select-MountDir {
 
 #Function to select Source WIM
 Function Select-SourceWIM {
-
     $SourceWIM = New-Object System.Windows.Forms.OpenFileDialog -Property @{
         InitialDirectory = "$PSScriptRoot\imports\wim"
         Filter           = 'WIM (*.wim)|'
@@ -568,12 +567,10 @@ Function Select-SourceWIM {
     $null = $SourceWIM.ShowDialog()
     $WPFSourceWIMSelectWIMTextBox.text = $SourceWIM.FileName
 
-
     if ($SourceWIM.FileName -notlike '*.wim') {
         Update-Log -Data 'A WIM file not selected. Please select a valid file to continue.' -Class Warning
         return
     }
-
 
     #Select the index
     $ImageFull = @(Get-WindowsImage -ImagePath $WPFSourceWIMSelectWIMTextBox.text)
@@ -595,7 +592,7 @@ Function Import-WimInfo($IndexNumber, [switch]$SkipUserConfirmation) {
     } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -data 'The WIM file selected may be borked. Try a different one' -Class Warning
-        Return
+        return
     }
     $text = 'WIM file selected: ' + $SourceWIM.FileName
     # $text = "WIM file selected: " + $ImageInfo.FileName
@@ -636,7 +633,6 @@ Function Import-WimInfo($IndexNumber, [switch]$SkipUserConfirmation) {
 
 #Function to Select JSON File
 Function Select-JSONFile {
-
     $JSON = New-Object System.Windows.Forms.OpenFileDialog -Property @{
         InitialDirectory = [Environment]::GetFolderPath('Desktop')
         Filter           = 'JSON (*.JSON)|'
@@ -679,417 +675,6 @@ Function Select-DriverSource($DriverTextBoxNumber) {
     Update-Log -Data "Driver path selected: $DriverDir" -Class Information
 }
 
-#Function for the Make it So button
-Function Invoke-MakeItSo ($appx) {
-    #Check if new file name is valid, also append file extension if neccessary
-
-    ###Starting MIS Preflight###
-    Test-MountPath -path $WPFMISMountTextBox.Text -clean True
-
-    if (($WPFMISWimNameTextBox.Text -eq '') -or ($WPFMISWimNameTextBox.Text -eq 'Enter Target WIM Name')) {
-        Update-Log -Data 'Enter a valid file name and then try again' -Class Error
-        return
-    }
-
-
-    if (($auto -eq $false) -and ($WPFCMCBImageType.SelectedItem -ne 'Update Existing Image' )) {
-
-        $checkresult = (Test-Name)
-        if ($checkresult -eq 'stop') { return }
-    }
-
-
-    #check for working directory, make if does not exist, delete files if they exist
-    Update-Log -Data 'Checking to see if the staging path exists...' -Class Information
-
-    try {
-        if (!(Test-Path "$PSScriptRoot\Staging" -PathType 'Any')) {
-            New-Item -ItemType Directory -Force -Path $PSScriptRoot\Staging -ErrorAction Stop
-            Update-Log -Data 'Path did not exist, but it does now' -Class Information -ErrorAction Stop
-        } Else {
-            Remove-Item –Path $PSScriptRoot\Staging\* -Recurse -ErrorAction Stop
-            Update-Log -Data 'The path existed, and it has been purged.' -Class Information -ErrorAction Stop
-        }
-    } catch {
-        Update-Log -data $_.Exception.Message -class Error
-        Update-Log -data "Something is wrong with folder $PSScriptRoot\Staging. Try deleting manually if it exists" -Class Error
-        return
-    }
-
-    if ($WPFJSONEnableCheckBox.IsChecked -eq $true) {
-        Update-Log -Data 'Validating existance of JSON file...' -Class Information
-        $APJSONExists = (Test-Path $WPFJSONTextBox.Text)
-        if ($APJSONExists -eq $true) { Update-Log -Data 'JSON exists. Continuing...' -Class Information }
-        else {
-            Update-Log -Data 'The Autopilot file could not be verified. Check it and try again.' -Class Error
-            return
-        }
-
-    }
-
-    if ($WPFMISDotNetCheckBox.IsChecked -eq $true) {
-        if ((Test-DotNetExists) -eq $False) { return }
-    }
-
-
-    #Check for free space
-    if ($SkipFreeSpaceCheck -eq $false) {
-        if (Test-FreeSpace -eq 1) {
-            Update-Log -Data 'Insufficient free space. Delete some files and try again' -Class Error
-            return
-        } else {
-            Update-Log -Data 'There is sufficient free space.' -Class Information
-        }
-    }
-    #####End of MIS Preflight###################################################################
-
-    #Copy source WIM
-    Update-Log -Data 'Copying source WIM to the staging folder' -Class Information
-
-    try {
-        Copy-Item $WPFSourceWIMSelectWIMTextBox.Text -Destination "$PSScriptRoot\Staging" -ErrorAction Stop
-    } catch {
-        Update-Log -data $_.Exception.Message -class Error
-        Update-Log -Data "The file couldn't be copied. No idea what happened" -class Error
-        return
-    }
-
-    Update-Log -Data 'Source WIM has been copied to the source folder' -Class Information
-
-    #Rename copied source WiM
-
-    try {
-        $wimname = Get-Item -Path $PSScriptRoot\Staging\*.wim -ErrorAction Stop
-        Rename-Item -Path $wimname -NewName $WPFMISWimNameTextBox.Text -ErrorAction Stop
-        Update-Log -Data 'Copied source WIM has been renamed' -Class Information
-    } catch {
-        Update-Log -data $_.Exception.Message -class Error
-        Update-Log -data "The copied source file couldn't be renamed. This shouldn't have happened." -Class Error
-        Update-Log -data "Go delete the WIM from $PSScriptRoot\Staging\, then try again" -Class Error
-        return
-    }
-
-    #Remove the unwanted indexes
-    Remove-OSIndex
-
-    #Mount the WIM File
-    $wimname = Get-Item -Path $PSScriptRoot\Staging\*.wim
-    Update-Log -Data "Mounting source WIM $wimname" -Class Information
-    Update-Log -Data 'to mount point:' -Class Information
-    Update-Log -data $WPFMISMountTextBox.Text -Class Information
-
-    try {
-        Mount-WindowsImage -Path $WPFMISMountTextBox.Text -ImagePath $wimname -Index 1 -ErrorAction Stop | Out-Null
-    } catch {
-        Update-Log -data $_.Exception.Message -class Error
-        Update-Log -data "The WIM couldn't be mounted. Make sure the mount directory is empty" -Class Error
-        Update-Log -Data "and that it isn't an active mount point" -Class Error
-        return
-    }
-
-    #checks to see if the iso binaries exist. Cancel and discard WIM if they are not present.
-    If (($WPFMISCBISO.IsChecked -eq $true) -or ($WPFMISCBUpgradePackage.IsChecked -eq $true)) {
-
-        if ((Test-IsoBinariesExist) -eq $False) {
-            Update-Log -Data 'Discarding WIM and not making it so' -Class Error
-            Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Discard -ErrorAction Stop | Out-Null
-            return
-        }
-    }
-
-    #Get Mounted WIM version and save it to a variable for useage later in the Function
-    $MISWinVer = (Get-WinVersionNumber)
-
-
-    #Pause after mounting
-    If ($WPFMISCBPauseMount.IsChecked -eq $True) {
-        Update-Log -Data 'Pausing image building. Waiting on user to continue...' -Class Warning
-        $Pause = Suspend-MakeItSo
-        if ($Pause -eq 'Yes') { Update-Log -data 'Continuing on with making it so...' -Class Information }
-        if ($Pause -eq 'No') {
-            Update-Log -data 'Discarding build...' -Class Error
-            Update-Log -Data 'Discarding mounted WIM' -Class Warning
-            Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Discard -ErrorAction Stop | Out-Null
-            Update-Log -Data 'WIM has been discarded. Better luck next time.' -Class Warning
-            return
-        }
-    }
-
-    #Run Script after mounting
-    if (($WPFCustomCBRunScript.IsChecked -eq $True) -and ($WPFCustomCBScriptTiming.SelectedItem -eq 'After image mount')) {
-        Update-Log -data 'Running PowerShell script...' -Class Information
-        Start-Script -file $WPFCustomTBFile.text -parameter $WPFCustomTBParameters.text
-        Update-Log -data 'Script completed.' -Class Information
-    }
-
-    #Language Packs and FOD
-    if ($WPFCustomCBLangPacks.IsChecked -eq $true) {
-        Install-LanguagePacks
-    } else {
-        Update-Log -Data 'Language Packs Injection not selected. Skipping...'
-    }
-
-    if ($WPFCustomCBLEP.IsChecked -eq $true) {
-        Install-LocalExperiencePack
-    } else {
-        Update-Log -Data 'Local Experience Packs not selected. Skipping...'
-    }
-
-    if ($WPFCustomCBFOD.IsChecked -eq $true) {
-        Install-FeaturesOnDemand
-    } else {
-        Update-Log -Data 'Features On Demand not selected. Skipping...'
-    }
-
-    #Inject .Net Binaries
-    if ($WPFMISDotNetCheckBox.IsChecked -eq $true) { Add-DotNet }
-
-    #Inject Autopilot JSON file
-    if ($WPFJSONEnableCheckBox.IsChecked -eq $true) {
-        Update-Log -Data 'Injecting JSON file' -Class Information
-        try {
-            $autopilotdir = $WPFMISMountTextBox.Text + '\windows\Provisioning\Autopilot'
-            Copy-Item $WPFJSONTextBox.Text -Destination $autopilotdir -ErrorAction Stop
-        } catch {
-            Update-Log -data $_.Exception.Message -class Error
-            Update-Log -data "JSON file couldn't be copied. Check to see if the correct SKU" -Class Error
-            Update-Log -Data 'of Windows has been selected' -Class Error
-            Update-log -Data "The WIM is still mounted. You'll need to clean that up manually until" -Class Error
-            Update-Log -data 'I get around to handling that error more betterer' -Class Error
-            return
-        }
-    } else {
-        Update-Log -Data 'JSON not selected. Skipping JSON Injection' -Class Information
-    }
-
-    #Inject Drivers
-    If ($WPFDriverCheckBox.IsChecked -eq $true) {
-        Start-DriverInjection -Folder $WPFDriverDir1TextBox.text
-        Start-DriverInjection -Folder $WPFDriverDir2TextBox.text
-        Start-DriverInjection -Folder $WPFDriverDir3TextBox.text
-        Start-DriverInjection -Folder $WPFDriverDir4TextBox.text
-        Start-DriverInjection -Folder $WPFDriverDir5TextBox.text
-    } Else {
-        Update-Log -Data 'Drivers were not selected for injection. Skipping.' -Class Information
-    }
-
-    #Inject default application association XML
-    if ($WPFCustomCBEnableApp.IsChecked -eq $true) {
-        Install-DefaultApplicationAssociations
-    } else {
-        Update-Log -Data 'Default Application Association not selected. Skipping...' -Class Information
-    }
-
-    #Inject start menu layout
-    if ($WPFCustomCBEnableStart.IsChecked -eq $true) {
-        Install-StartLayout
-    } else {
-        Update-Log -Data 'Start Menu Layout injection not selected. Skipping...' -Class Information
-    }
-
-    #apply registry files
-    if ($WPFCustomCBEnableRegistry.IsChecked -eq $true) {
-        Install-RegistryFiles
-    } else {
-        Update-Log -Data 'Registry file injection not selected. Skipping...' -Class Information
-    }
-
-    #Check for updates when ConfigMgr source is selected
-    if ($WPFMISCBCheckForUpdates.IsChecked -eq $true) {
-        Invoke-MISUpdates
-        if (($WPFSourceWIMImgDesTextBox.text -like '*Windows 10*') -or ($WPFSourceWIMImgDesTextBox.text -like '*Windows 11*')) { Get-OneDrive }
-    }
-
-    #Apply Updates
-    If ($WPFUpdatesEnableCheckBox.IsChecked -eq $true) {
-        Deploy-Updates -class 'SSU'
-        Deploy-Updates -class 'LCU'
-        Deploy-Updates -class 'AdobeSU'
-        Deploy-Updates -class 'DotNet'
-        Deploy-Updates -class 'DotNetCU'
-        #if ($WPFUpdatesCBEnableDynamic.IsChecked -eq $True){Deploy-Updates -class "Dynamic"}
-        if ($WPFUpdatesOptionalEnableCheckBox.IsChecked -eq $True) {
-            Deploy-Updates -class 'Optional'
-        }
-    } else {
-        Update-Log -Data 'Updates not enabled' -Class Information
-    }
-
-    #Copy the current OneDrive installer
-    if ($WPFMISOneDriveCheckBox.IsChecked -eq $true) {
-        $os = Get-WindowsType
-        $build = Get-WinVersionNumber
-
-        if (($os -eq 'Windows 11') -and ($build -eq '22H2') -or ($build -eq '23H2')) {
-            Copy-OneDrivex64
-        } else {
-            Copy-OneDrive
-        }
-    } else {
-        Update-Log -data 'OneDrive agent update skipped as it was not selected' -Class Information
-    }
-
-    #Remove AppX Packages
-    if ($WPFAppxCheckBox.IsChecked -eq $true) {
-        Remove-Appx -array $appx
-    } Else {
-        Update-Log -Data 'App removal not enabled' -Class Information
-    }
-
-    #Run Script before dismount
-    if (($WPFCustomCBRunScript.IsChecked -eq $True) -and ($WPFCustomCBScriptTiming.SelectedItem -eq 'Before image dismount')) {
-        Start-Script -file $WPFCustomTBFile.text -parameter $WPFCustomTBParameters.text
-    }
-
-    #Pause before dismounting
-    If ($WPFMISCBPauseDismount.IsChecked -eq $True) {
-        Update-Log -Data 'Pausing image building. Waiting on user to continue...' -Class Warning
-        $Pause = Suspend-MakeItSo
-        if ($Pause -eq 'Yes') { Update-Log -data 'Continuing on with making it so...' -Class Information }
-        if ($Pause -eq 'No') {
-            Update-Log -data 'Discarding build...' -Class Error
-            Update-Log -Data 'Discarding mounted WIM' -Class Warning
-            Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Discard -ErrorAction Stop | Out-Null
-            Update-Log -Data 'WIM has been discarded. Better luck next time.' -Class Warning
-            return
-        }
-    }
-
-    #Copy log to mounted WIM
-    try {
-        Update-Log -Data 'Attempting to copy log to mounted image' -Class Information
-        $mountlogdir = $WPFMISMountTextBox.Text + '\windows\'
-        Copy-Item $PSScriptRoot\logging\WIMWitch.log -Destination $mountlogdir -ErrorAction Stop
-        $CopyLogExist = Test-Path $mountlogdir\WIMWitch.log -PathType Leaf
-        if ($CopyLogExist -eq $true) { Update-Log -Data 'Log filed copied successfully' -Class Information }
-    } catch {
-        Update-Log -data $_.Exception.Message -class Error
-        Update-Log -data "Coudn't copy the log file to the mounted image." -class Error
-    }
-
-    #Dismount, commit, and move WIM
-    Update-Log -Data 'Dismounting WIM file, committing changes' -Class Information
-    try {
-        Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Save -ErrorAction Stop | Out-Null
-    } catch {
-        Update-Log -data $_.Exception.Message -class Error
-        Update-Log -data "The WIM couldn't save. You will have to manually discard the" -Class Error
-        Update-Log -data 'mounted image manually' -Class Error
-        return
-    }
-    Update-Log -Data 'WIM dismounted' -Class Information
-
-    #Display new version number
-    $WimInfo = (Get-WindowsImage -ImagePath $wimname -Index 1)
-    $text = 'New image version number is ' + $WimInfo.Version
-    Update-Log -data $text -Class Information
-
-    if (($auto -eq $true) -or ($WPFCMCBImageType.SelectedItem -eq 'Update Existing Image')) {
-        Update-Log -Data 'Backing up old WIM file...' -Class Information
-        $checkresult = (Test-Name -conflict append)
-        if ($checkresult -eq 'stop') { return }
-    }
-
-    #stage media if check boxes are selected
-    if (($WPFMISCBUpgradePackage.IsChecked -eq $true) -or ($WPFMISCBISO.IsChecked -eq $true)) {
-        Copy-StageIsoMedia
-        Update-Log -Data 'Exporting install.wim to media staging folder...' -Class Information
-        Export-WindowsImage -SourceImagePath $wimname -SourceIndex 1 -DestinationImagePath ($PSScriptRoot + '\staging\media\sources\install.wim') -DestinationName ('WW - ' + $WPFSourceWIMImgDesTextBox.text) | Out-Null
-    }
-
-    #Export the wim file to various locations
-    if ($WPFMISCBNoWIM.IsChecked -ne $true) {
-        try {
-            Update-Log -Data 'Exporting WIM file' -Class Information
-            Export-WindowsImage -SourceImagePath $wimname -SourceIndex 1 -DestinationImagePath ($WPFMISWimFolderTextBox.Text + '\' + $WPFMISWimNameTextBox.Text) -DestinationName ('WW - ' + $WPFSourceWIMImgDesTextBox.text) | Out-Null
-        } catch {
-            Update-Log -data $_.Exception.Message -class Error
-            Update-Log -data "The WIM couldn't be exported. You can still retrieve it from staging path." -Class Error
-            Update-Log -data 'The file will be deleted when the tool is rerun.' -Class Error
-            return
-        }
-        Update-Log -Data 'WIM successfully exported to target folder' -Class Information
-    }
-
-    #ConfigMgr Integration
-    if ($WPFCMCBImageType.SelectedItem -ne 'Disabled') {
-        #  "New Image","Update Existing Image"
-        if ($WPFCMCBImageType.SelectedItem -eq 'New Image') {
-            Update-Log -data 'Creating a new image in ConfigMgr...' -class Information
-            New-CMImagePackage
-        }
-
-        if ($WPFCMCBImageType.SelectedItem -eq 'Update Existing Image') {
-            Update-Log -data 'Updating the existing image in ConfigMgr...' -class Information
-            Update-CMImage
-        }
-    }
-
-    #Apply Dynamic Update to media
-    if ($WPFMISCBDynamicUpdates.IsChecked -eq $true) {
-        Deploy-Updates -class 'Dynamic'
-    } else {
-        Update-Log -data 'Dynamic Updates skipped or not applicable' -Class Information
-    }
-
-    #Apply updates to the boot.wim file
-    if ($WPFMISCBBootWIM.IsChecked -eq $true) {
-        Update-BootWIM
-    } else {
-        Update-Log -data 'Updating Boot.WIM skipped or not applicable' -Class Information
-    }
-
-    #Copy upgrade package binaries if selected
-    if ($WPFMISCBUpgradePackage.IsChecked -eq $true) {
-        Copy-UpgradePackage
-    } else {
-        Update-Log -Data 'Upgrade Package skipped or not applicable' -Class Information
-    }
-
-    #Create ISO if selected
-    if ($WPFMISCBISO.IsChecked -eq $true) {
-        New-WindowsISO
-    } else {
-        Update-Log -Data 'ISO Creation skipped or not applicable' -Class Information
-    }
-
-    #Run Script when build complete
-    if (($WPFCustomCBRunScript.IsChecked -eq $True) -and ($WPFCustomCBScriptTiming.SelectedItem -eq 'On build completion')) {
-        Start-Script -file $WPFCustomTBFile.text -parameter $WPFCustomTBParameters.text
-    }
-
-    #Clear out staging folder
-    try {
-        Update-Log -Data 'Clearing staging folder...' -Class Information
-        Remove-Item $PSScriptRoot\staging\* -Force -Recurse -ErrorAction Stop
-    } catch {
-        Update-Log -Data 'Could not clear staging folder' -Class Warning
-        Update-Log -data $_.Exception.Message -class Error
-    }
-
-    #Copy log here
-    try {
-        Update-Log -Data 'Copying build log to target folder' -Class Information
-        Copy-Item -Path $PSScriptRoot\logging\WIMWitch.log -Destination $WPFMISWimFolderTextBox.Text -ErrorAction Stop
-        $logold = $WPFMISWimFolderTextBox.Text + '\WIMWitch.log'
-        $lognew = $WPFMISWimFolderTextBox.Text + '\' + $WPFMISWimNameTextBox.Text + '.log'
-        #Put log detection code here
-        if ((Test-Path -Path $lognew) -eq $true) {
-            Update-Log -Data 'A preexisting log file contains the same name. Renaming old log...' -Class Warning
-            Rename-Name -file $lognew -extension '.log'
-        }
-
-        #Put log detection code here
-        Rename-Item $logold -NewName $lognew -Force -ErrorAction Stop
-        Update-Log -Data 'Log copied successfully' -Class Information
-    } catch {
-        Update-Log -data $_.Exception.Message -class Error
-        Update-Log -data "The log file couldn't be copied and renamed. You can still snag it from the source." -Class Error
-        Update-Log -Data "Job's done." -Class Information
-        return
-    }
-    Update-Log -Data "Job's done." -Class Information
-}
 
 #Function to assign the target directory
 Function Select-TargetDir {
@@ -1474,10 +1059,7 @@ Function Test-Superceded($action, $OS, $Build) {
                         Remove-Item -Path $path3 -Recurse -Force
                     }
                     if ($action -eq 'audit') {
-
-                        # $WPFUpdatesOSDBSupercededExistTextBlock.Visibility = "Visible"
                         $WPFUpdatesOSDListBox.items.add('Superceded updates discovered. Please select the versions of Windows 10 you are supporting and click Update')
-
                         Return
                     }
                 } else {
@@ -1486,15 +1068,11 @@ Function Test-Superceded($action, $OS, $Build) {
             }
         }
     }
-    Update-Log -data 'Supersedense check complete.' -Class Information
+    Update-Log -data 'Supercedense check complete.' -Class Information
 }
 
 #Function to download new patches with OSDSUS
 Function Get-WindowsPatches($build, $OS) {
-
-    Write-Host $build
-    Write-Host $OS
-
     Update-Log -Data "Downloading SSU updates for $OS $build" -Class Information
     try {
         Get-OSDUpdate -ErrorAction Stop | Where-Object { $_.UpdateOS -eq $OS -and $_.UpdateArch -eq 'x64' -and $_.UpdateBuild -eq $build -and $_.UpdateGroup -eq 'SSU' } | Get-DownOSDUpdate -DownloadPath $PSScriptRoot\updates\$OS\$build\SSU
@@ -1606,7 +1184,6 @@ Function Update-PatchSource {
                 Test-Superceded -action delete -build 1709 -OS 'Windows 10'
                 Get-WindowsPatches -build 1709 -OS 'Windows 10'
             }
-            #Get-OneDrive
         }
         if ($WPFUpdatesS2019.IsChecked -eq $true) {
             Test-Superceded -action delete -build 1809 -OS 'Windows Server'
@@ -1622,9 +1199,7 @@ Function Update-PatchSource {
         }
 
         if ($WPFUpdatesW11Main.IsChecked -eq $true) {
-
             if ($WPFUpdatesW11_22H2.IsChecked -eq $true) {
-
                 Test-Superceded -action delete -build 22H2 -OS 'Windows 11'
                 Get-WindowsPatches -build 22H2 -OS 'Windows 11'
             }
@@ -1633,12 +1208,10 @@ Function Update-PatchSource {
                 Test-Superceded -action delete -build 21H2 -OS 'Windows 11'
                 Get-WindowsPatches -build 21H2 -OS 'Windows 11'
             }
-            
             if ($WPFUpdatesW11_23h2.IsChecked -eq $true) {
                 Write-Host '23H2'
                 Test-Superceded -action delete -build 23H2 -OS 'Windows 11'
                 Get-WindowsPatches -build 23H2 -OS 'Windows 11'
-
             }
 
         }
@@ -1727,8 +1300,6 @@ Function Deploy-LCU($packagepath) {
     if ($osver -eq 'Windows 10') {
         $executable = "$env:windir\system32\expand.exe"
         $filename = (Get-ChildItem $packagepath).name
-
-
         Update-Log -Data 'Extracting LCU Package content to staging folder...' -Class Information
         Start-Process $executable -args @("`"$packagepath\$filename`"", '/f:*.CAB', "`"$PSScriptRoot\staging`"") -Wait -ErrorAction Stop
         $cabs = (Get-Item $PSScriptRoot\staging\*.cab)
@@ -1749,8 +1320,6 @@ Function Deploy-LCU($packagepath) {
 
         }
 
-
-
         Update-Log -data 'Applying LCU...' -class information
         foreach ($cab in $cabs) {
             if ($cab -notlike '*SSU*') {
@@ -1761,22 +1330,14 @@ Function Deploy-LCU($packagepath) {
                     Update-Log -data $string -Class Warning
                 }
             }
-
-            #Add-WindowsPackage -path $WPFMISMountTextBox.Text -PackagePath $cab -erroraction stop| Out-Null}}
         }
-
-
     }
     if ($osver -eq 'Windows 11') {
-        #copy file to staging
+        # Copy file to staging
         Update-Log -data 'Copying LCU file to staging folder...' -class information
-
         $filename = (Get-ChildItem -Path $packagepath -Name)
         Copy-Item -Path $packagepath\$filename -Destination $PSScriptRoot\staging -Force
-        #rename file
-
-        #  $filename = Split-Path -Path $packagepath -Leaf
-        # write-host $filename
+        
         Update-Log -data 'Changing file extension type from CAB to MSU...' -class information
         $basename = (Get-Item -Path $PSScriptRoot\staging\$filename).BaseName
         $newname = $basename + '.msu'
@@ -1788,17 +1349,13 @@ Function Deploy-LCU($packagepath) {
         Update-Log -data $updatename -Class Information
 
         try {
-            #    Add-WindowsPackage -path $WPFMISMountTextBox.Text -PackagePath $PSScriptRoot\staging\$newname -ErrorAction Stop
-            if ($demomode -eq $false) { Add-WindowsPackage -Path $WPFMISMountTextBox.Text -PackagePath $PSScriptRoot\staging\$newname -ErrorAction Stop | Out-Null }
-            else {
+            if ($demomode -eq $false) {
+                Add-WindowsPackage -Path $WPFMISMountTextBox.Text -PackagePath $PSScriptRoot\staging\$newname -ErrorAction Stop | Out-Null
+            } else {
                 $string = 'Demo mode active - Not applying ' + $updatename
                 Update-Log -data $string -Class Warning
             }
-
-
-        }
-
-        catch {
+        } catch {
             Update-Log -data 'Failed to apply update' -class Warning
             Update-Log -data $_.Exception.Message -class Warning
         }
@@ -1819,9 +1376,7 @@ Function Deploy-Updates($class) {
     $OS = Get-WindowsType
     $buildnum = Get-WinVersionNumber
 
-
     if ($buildnum -eq '2009') { $buildnum = '20H2' }
-
 
     If (($WPFSourceWimVerTextBox.text -like '10.0.18362.*') -and (($class -ne 'Dynamic') -and ($class -notlike 'PE*'))) {
         $mountdir = $WPFMISMountTextBox.Text
@@ -1830,7 +1385,6 @@ Function Deploy-Updates($class) {
         $buildnum = $regvalues.ReleaseId
         reg UNLOAD HKLM\OFFLINE | Out-Null
     }
-
 
     If (($WPFSourceWimVerTextBox.text -like '10.0.18362.*') -and (($class -eq 'Dynamic') -or ($class -like 'PE*'))) {
         $windowsver = Get-WindowsImage -ImagePath ($PSScriptRoot + '\staging\' + $WPFMISWimNameTextBox.text) -Index 1
@@ -2357,9 +1911,56 @@ Function Select-Appx {
         'Microsoft.ZuneMusic_2019.19071.19011.0_neutral_~_8wekyb3d8bbwe',
         'Microsoft.ZuneVideo_2019.19071.19011.0_neutral_~_8wekyb3d8bbwe'
     )
+    $appxWin11_23H2 = @('Clipchamp.Clipchamp_2.2.8.0_neutral_~_yxz26nhyzhsrt',
+        'Microsoft.549981C3F5F10_3.2204.14815.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.BingNews_4.2.27001.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.BingWeather_4.53.33420.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.DesktopAppInstaller_2022.310.2333.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.GamingApp_2021.427.138.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.GetHelp_10.2201.421.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.Getstarted_2021.2204.1.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.HEIFImageExtension_1.0.43012.0_x64__8wekyb3d8bbwe',
+        'Microsoft.HEVCVideoExtension_1.0.50361.0_x64__8wekyb3d8bbwe',
+        'Microsoft.MicrosoftOfficeHub_18.2204.1141.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.MicrosoftSolitaireCollection_4.12.3171.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.MicrosoftStickyNotes_4.2.2.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.Paint_11.2201.22.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.People_2020.901.1724.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.PowerAutomateDesktop_10.0.3735.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.RawImageExtension_2.1.30391.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.ScreenSketch_2022.2201.12.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.SecHealthUI_1000.22621.1.0_x64__8wekyb3d8bbwe',
+        'Microsoft.StorePurchaseApp_12008.1001.113.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.Todos_2.54.42772.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.VCLibs.140.00_14.0.30704.0_x64__8wekyb3d8bbwe',
+        'Microsoft.VP9VideoExtensions_1.0.50901.0_x64__8wekyb3d8bbwe',
+        'Microsoft.WebMediaExtensions_1.0.42192.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WebpImageExtension_1.0.42351.0_x64__8wekyb3d8bbwe',
+        'Microsoft.Windows.Photos_21.21030.25003.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsAlarms_2022.2202.24.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsCalculator_2020.2103.8.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsCamera_2022.2201.4.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.windowscommunicationsapps_16005.14326.20544.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsFeedbackHub_2022.106.2230.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsMaps_2022.2202.6.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsNotepad_11.2112.32.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsSoundRecorder_2021.2103.28.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsStore_22204.1400.4.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.WindowsTerminal_3001.12.10983.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.Xbox.TCUI_1.23.28004.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.XboxGameOverlay_1.47.2385.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.XboxGamingOverlay_2.622.3232.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.XboxIdentityProvider_12.50.6001.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.XboxSpeechToTextOverlay_1.17.29001.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.YourPhone_1.22022.147.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.ZuneMusic_11.2202.46.0_neutral_~_8wekyb3d8bbwe',
+        'Microsoft.ZuneVideo_2019.22020.10021.0_neutral_~_8wekyb3d8bbwe',
+        'MicrosoftCorporationII.QuickAssist_2022.414.1758.0_neutral_~_8wekyb3d8bbwe',
+        'MicrosoftWindows.Client.WebExperience_421.20070.195.0_neutral_~_cw5n1h2txyewy',
+        'MicrosoftWindows.Client.CBS_1000.22677.1000.0_x64__cw5n1h2txyewy'
+    )
 
     $OS = Get-WindowsType
-    #$buildnum = Get-WinVersionNumber
     $buildnum = $WPFSourceWimTBVersionNum.text
 
     if ($OS -eq 'Windows 10') {
@@ -7358,6 +6959,419 @@ Function Invoke-19041Select {
     $Form.ShowDialog() | Out-Null
 
 }
+
+#Function for the Make it So button
+Function Invoke-MakeItSo ($appx) {
+    #Check if new file name is valid, also append file extension if neccessary
+
+    ###Starting MIS Preflight###
+    Test-MountPath -path $WPFMISMountTextBox.Text -clean True
+
+    if (($WPFMISWimNameTextBox.Text -eq '') -or ($WPFMISWimNameTextBox.Text -eq 'Enter Target WIM Name')) {
+        Update-Log -Data 'Enter a valid file name and then try again' -Class Error
+        return
+    }
+
+
+    if (($auto -eq $false) -and ($WPFCMCBImageType.SelectedItem -ne 'Update Existing Image' )) {
+
+        $checkresult = (Test-Name)
+        if ($checkresult -eq 'stop') { return }
+    }
+
+
+    #check for working directory, make if does not exist, delete files if they exist
+    Update-Log -Data 'Checking to see if the staging path exists...' -Class Information
+
+    try {
+        if (!(Test-Path "$PSScriptRoot\Staging" -PathType 'Any')) {
+            New-Item -ItemType Directory -Force -Path $PSScriptRoot\Staging -ErrorAction Stop
+            Update-Log -Data 'Path did not exist, but it does now' -Class Information -ErrorAction Stop
+        } Else {
+            Remove-Item –Path $PSScriptRoot\Staging\* -Recurse -ErrorAction Stop
+            Update-Log -Data 'The path existed, and it has been purged.' -Class Information -ErrorAction Stop
+        }
+    } catch {
+        Update-Log -data $_.Exception.Message -class Error
+        Update-Log -data "Something is wrong with folder $PSScriptRoot\Staging. Try deleting manually if it exists" -Class Error
+        return
+    }
+
+    if ($WPFJSONEnableCheckBox.IsChecked -eq $true) {
+        Update-Log -Data 'Validating existance of JSON file...' -Class Information
+        $APJSONExists = (Test-Path $WPFJSONTextBox.Text)
+        if ($APJSONExists -eq $true) { Update-Log -Data 'JSON exists. Continuing...' -Class Information }
+        else {
+            Update-Log -Data 'The Autopilot file could not be verified. Check it and try again.' -Class Error
+            return
+        }
+
+    }
+
+    if ($WPFMISDotNetCheckBox.IsChecked -eq $true) {
+        if ((Test-DotNetExists) -eq $False) { return }
+    }
+
+
+    #Check for free space
+    if ($SkipFreeSpaceCheck -eq $false) {
+        if (Test-FreeSpace -eq 1) {
+            Update-Log -Data 'Insufficient free space. Delete some files and try again' -Class Error
+            return
+        } else {
+            Update-Log -Data 'There is sufficient free space.' -Class Information
+        }
+    }
+    #####End of MIS Preflight###################################################################
+
+    #Copy source WIM
+    Update-Log -Data 'Copying source WIM to the staging folder' -Class Information
+
+    try {
+        Copy-Item $WPFSourceWIMSelectWIMTextBox.Text -Destination "$PSScriptRoot\Staging" -ErrorAction Stop
+    } catch {
+        Update-Log -data $_.Exception.Message -class Error
+        Update-Log -Data "The file couldn't be copied. No idea what happened" -class Error
+        return
+    }
+
+    Update-Log -Data 'Source WIM has been copied to the source folder' -Class Information
+
+    #Rename copied source WiM
+
+    try {
+        $wimname = Get-Item -Path $PSScriptRoot\Staging\*.wim -ErrorAction Stop
+        Rename-Item -Path $wimname -NewName $WPFMISWimNameTextBox.Text -ErrorAction Stop
+        Update-Log -Data 'Copied source WIM has been renamed' -Class Information
+    } catch {
+        Update-Log -data $_.Exception.Message -class Error
+        Update-Log -data "The copied source file couldn't be renamed. This shouldn't have happened." -Class Error
+        Update-Log -data "Go delete the WIM from $PSScriptRoot\Staging\, then try again" -Class Error
+        return
+    }
+
+    #Remove the unwanted indexes
+    Remove-OSIndex
+
+    #Mount the WIM File
+    $wimname = Get-Item -Path $PSScriptRoot\Staging\*.wim
+    Update-Log -Data "Mounting source WIM $wimname" -Class Information
+    Update-Log -Data 'to mount point:' -Class Information
+    Update-Log -data $WPFMISMountTextBox.Text -Class Information
+
+    try {
+        Mount-WindowsImage -Path $WPFMISMountTextBox.Text -ImagePath $wimname -Index 1 -ErrorAction Stop | Out-Null
+    } catch {
+        Update-Log -data $_.Exception.Message -class Error
+        Update-Log -data "The WIM couldn't be mounted. Make sure the mount directory is empty" -Class Error
+        Update-Log -Data "and that it isn't an active mount point" -Class Error
+        return
+    }
+
+    #checks to see if the iso binaries exist. Cancel and discard WIM if they are not present.
+    If (($WPFMISCBISO.IsChecked -eq $true) -or ($WPFMISCBUpgradePackage.IsChecked -eq $true)) {
+
+        if ((Test-IsoBinariesExist) -eq $False) {
+            Update-Log -Data 'Discarding WIM and not making it so' -Class Error
+            Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Discard -ErrorAction Stop | Out-Null
+            return
+        }
+    }
+
+    #Get Mounted WIM version and save it to a variable for useage later in the Function
+    $MISWinVer = (Get-WinVersionNumber)
+
+
+    #Pause after mounting
+    If ($WPFMISCBPauseMount.IsChecked -eq $True) {
+        Update-Log -Data 'Pausing image building. Waiting on user to continue...' -Class Warning
+        $Pause = Suspend-MakeItSo
+        if ($Pause -eq 'Yes') { Update-Log -data 'Continuing on with making it so...' -Class Information }
+        if ($Pause -eq 'No') {
+            Update-Log -data 'Discarding build...' -Class Error
+            Update-Log -Data 'Discarding mounted WIM' -Class Warning
+            Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Discard -ErrorAction Stop | Out-Null
+            Update-Log -Data 'WIM has been discarded. Better luck next time.' -Class Warning
+            return
+        }
+    }
+
+    #Run Script after mounting
+    if (($WPFCustomCBRunScript.IsChecked -eq $True) -and ($WPFCustomCBScriptTiming.SelectedItem -eq 'After image mount')) {
+        Update-Log -data 'Running PowerShell script...' -Class Information
+        Start-Script -file $WPFCustomTBFile.text -parameter $WPFCustomTBParameters.text
+        Update-Log -data 'Script completed.' -Class Information
+    }
+
+    #Language Packs and FOD
+    if ($WPFCustomCBLangPacks.IsChecked -eq $true) {
+        Install-LanguagePacks
+    } else {
+        Update-Log -Data 'Language Packs Injection not selected. Skipping...'
+    }
+
+    if ($WPFCustomCBLEP.IsChecked -eq $true) {
+        Install-LocalExperiencePack
+    } else {
+        Update-Log -Data 'Local Experience Packs not selected. Skipping...'
+    }
+
+    if ($WPFCustomCBFOD.IsChecked -eq $true) {
+        Install-FeaturesOnDemand
+    } else {
+        Update-Log -Data 'Features On Demand not selected. Skipping...'
+    }
+
+    #Inject .Net Binaries
+    if ($WPFMISDotNetCheckBox.IsChecked -eq $true) { Add-DotNet }
+
+    #Inject Autopilot JSON file
+    if ($WPFJSONEnableCheckBox.IsChecked -eq $true) {
+        Update-Log -Data 'Injecting JSON file' -Class Information
+        try {
+            $autopilotdir = $WPFMISMountTextBox.Text + '\windows\Provisioning\Autopilot'
+            Copy-Item $WPFJSONTextBox.Text -Destination $autopilotdir -ErrorAction Stop
+        } catch {
+            Update-Log -data $_.Exception.Message -class Error
+            Update-Log -data "JSON file couldn't be copied. Check to see if the correct SKU" -Class Error
+            Update-Log -Data 'of Windows has been selected' -Class Error
+            Update-log -Data "The WIM is still mounted. You'll need to clean that up manually until" -Class Error
+            Update-Log -data 'I get around to handling that error more betterer' -Class Error
+            return
+        }
+    } else {
+        Update-Log -Data 'JSON not selected. Skipping JSON Injection' -Class Information
+    }
+
+    #Inject Drivers
+    If ($WPFDriverCheckBox.IsChecked -eq $true) {
+        Start-DriverInjection -Folder $WPFDriverDir1TextBox.text
+        Start-DriverInjection -Folder $WPFDriverDir2TextBox.text
+        Start-DriverInjection -Folder $WPFDriverDir3TextBox.text
+        Start-DriverInjection -Folder $WPFDriverDir4TextBox.text
+        Start-DriverInjection -Folder $WPFDriverDir5TextBox.text
+    } Else {
+        Update-Log -Data 'Drivers were not selected for injection. Skipping.' -Class Information
+    }
+
+    #Inject default application association XML
+    if ($WPFCustomCBEnableApp.IsChecked -eq $true) {
+        Install-DefaultApplicationAssociations
+    } else {
+        Update-Log -Data 'Default Application Association not selected. Skipping...' -Class Information
+    }
+
+    #Inject start menu layout
+    if ($WPFCustomCBEnableStart.IsChecked -eq $true) {
+        Install-StartLayout
+    } else {
+        Update-Log -Data 'Start Menu Layout injection not selected. Skipping...' -Class Information
+    }
+
+    #apply registry files
+    if ($WPFCustomCBEnableRegistry.IsChecked -eq $true) {
+        Install-RegistryFiles
+    } else {
+        Update-Log -Data 'Registry file injection not selected. Skipping...' -Class Information
+    }
+
+    #Check for updates when ConfigMgr source is selected
+    if ($WPFMISCBCheckForUpdates.IsChecked -eq $true) {
+        Invoke-MISUpdates
+        if (($WPFSourceWIMImgDesTextBox.text -like '*Windows 10*') -or ($WPFSourceWIMImgDesTextBox.text -like '*Windows 11*')) { Get-OneDrive }
+    }
+
+    #Apply Updates
+    If ($WPFUpdatesEnableCheckBox.IsChecked -eq $true) {
+        Deploy-Updates -class 'SSU'
+        Deploy-Updates -class 'LCU'
+        Deploy-Updates -class 'AdobeSU'
+        Deploy-Updates -class 'DotNet'
+        Deploy-Updates -class 'DotNetCU'
+        #if ($WPFUpdatesCBEnableDynamic.IsChecked -eq $True){Deploy-Updates -class "Dynamic"}
+        if ($WPFUpdatesOptionalEnableCheckBox.IsChecked -eq $True) {
+            Deploy-Updates -class 'Optional'
+        }
+    } else {
+        Update-Log -Data 'Updates not enabled' -Class Information
+    }
+
+    #Copy the current OneDrive installer
+    if ($WPFMISOneDriveCheckBox.IsChecked -eq $true) {
+        $os = Get-WindowsType
+        $build = Get-WinVersionNumber
+
+        if (($os -eq 'Windows 11') -and ($build -eq '22H2') -or ($build -eq '23H2')) {
+            Copy-OneDrivex64
+        } else {
+            Copy-OneDrive
+        }
+    } else {
+        Update-Log -data 'OneDrive agent update skipped as it was not selected' -Class Information
+    }
+
+    #Remove AppX Packages
+    if ($WPFAppxCheckBox.IsChecked -eq $true) {
+        Remove-Appx -array $appx
+    } Else {
+        Update-Log -Data 'App removal not enabled' -Class Information
+    }
+
+    #Run Script before dismount
+    if (($WPFCustomCBRunScript.IsChecked -eq $True) -and ($WPFCustomCBScriptTiming.SelectedItem -eq 'Before image dismount')) {
+        Start-Script -file $WPFCustomTBFile.text -parameter $WPFCustomTBParameters.text
+    }
+
+    #Pause before dismounting
+    If ($WPFMISCBPauseDismount.IsChecked -eq $True) {
+        Update-Log -Data 'Pausing image building. Waiting on user to continue...' -Class Warning
+        $Pause = Suspend-MakeItSo
+        if ($Pause -eq 'Yes') { Update-Log -data 'Continuing on with making it so...' -Class Information }
+        if ($Pause -eq 'No') {
+            Update-Log -data 'Discarding build...' -Class Error
+            Update-Log -Data 'Discarding mounted WIM' -Class Warning
+            Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Discard -ErrorAction Stop | Out-Null
+            Update-Log -Data 'WIM has been discarded. Better luck next time.' -Class Warning
+            return
+        }
+    }
+
+    #Copy log to mounted WIM
+    try {
+        Update-Log -Data 'Attempting to copy log to mounted image' -Class Information
+        $mountlogdir = $WPFMISMountTextBox.Text + '\windows\'
+        Copy-Item $PSScriptRoot\logging\WIMWitch.log -Destination $mountlogdir -ErrorAction Stop
+        $CopyLogExist = Test-Path $mountlogdir\WIMWitch.log -PathType Leaf
+        if ($CopyLogExist -eq $true) { Update-Log -Data 'Log filed copied successfully' -Class Information }
+    } catch {
+        Update-Log -data $_.Exception.Message -class Error
+        Update-Log -data "Coudn't copy the log file to the mounted image." -class Error
+    }
+
+    #Dismount, commit, and move WIM
+    Update-Log -Data 'Dismounting WIM file, committing changes' -Class Information
+    try {
+        Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Save -ErrorAction Stop | Out-Null
+    } catch {
+        Update-Log -data $_.Exception.Message -class Error
+        Update-Log -data "The WIM couldn't save. You will have to manually discard the" -Class Error
+        Update-Log -data 'mounted image manually' -Class Error
+        return
+    }
+    Update-Log -Data 'WIM dismounted' -Class Information
+
+    #Display new version number
+    $WimInfo = (Get-WindowsImage -ImagePath $wimname -Index 1)
+    $text = 'New image version number is ' + $WimInfo.Version
+    Update-Log -data $text -Class Information
+
+    if (($auto -eq $true) -or ($WPFCMCBImageType.SelectedItem -eq 'Update Existing Image')) {
+        Update-Log -Data 'Backing up old WIM file...' -Class Information
+        $checkresult = (Test-Name -conflict append)
+        if ($checkresult -eq 'stop') { return }
+    }
+
+    #stage media if check boxes are selected
+    if (($WPFMISCBUpgradePackage.IsChecked -eq $true) -or ($WPFMISCBISO.IsChecked -eq $true)) {
+        Copy-StageIsoMedia
+        Update-Log -Data 'Exporting install.wim to media staging folder...' -Class Information
+        Export-WindowsImage -SourceImagePath $wimname -SourceIndex 1 -DestinationImagePath ($PSScriptRoot + '\staging\media\sources\install.wim') -DestinationName ('WW - ' + $WPFSourceWIMImgDesTextBox.text) | Out-Null
+    }
+
+    #Export the wim file to various locations
+    if ($WPFMISCBNoWIM.IsChecked -ne $true) {
+        try {
+            Update-Log -Data 'Exporting WIM file' -Class Information
+            Export-WindowsImage -SourceImagePath $wimname -SourceIndex 1 -DestinationImagePath ($WPFMISWimFolderTextBox.Text + '\' + $WPFMISWimNameTextBox.Text) -DestinationName ('WW - ' + $WPFSourceWIMImgDesTextBox.text) | Out-Null
+        } catch {
+            Update-Log -data $_.Exception.Message -class Error
+            Update-Log -data "The WIM couldn't be exported. You can still retrieve it from staging path." -Class Error
+            Update-Log -data 'The file will be deleted when the tool is rerun.' -Class Error
+            return
+        }
+        Update-Log -Data 'WIM successfully exported to target folder' -Class Information
+    }
+
+    #ConfigMgr Integration
+    if ($WPFCMCBImageType.SelectedItem -ne 'Disabled') {
+        #  "New Image","Update Existing Image"
+        if ($WPFCMCBImageType.SelectedItem -eq 'New Image') {
+            Update-Log -data 'Creating a new image in ConfigMgr...' -class Information
+            New-CMImagePackage
+        }
+
+        if ($WPFCMCBImageType.SelectedItem -eq 'Update Existing Image') {
+            Update-Log -data 'Updating the existing image in ConfigMgr...' -class Information
+            Update-CMImage
+        }
+    }
+
+    #Apply Dynamic Update to media
+    if ($WPFMISCBDynamicUpdates.IsChecked -eq $true) {
+        Deploy-Updates -class 'Dynamic'
+    } else {
+        Update-Log -data 'Dynamic Updates skipped or not applicable' -Class Information
+    }
+
+    #Apply updates to the boot.wim file
+    if ($WPFMISCBBootWIM.IsChecked -eq $true) {
+        Update-BootWIM
+    } else {
+        Update-Log -data 'Updating Boot.WIM skipped or not applicable' -Class Information
+    }
+
+    #Copy upgrade package binaries if selected
+    if ($WPFMISCBUpgradePackage.IsChecked -eq $true) {
+        Copy-UpgradePackage
+    } else {
+        Update-Log -Data 'Upgrade Package skipped or not applicable' -Class Information
+    }
+
+    #Create ISO if selected
+    if ($WPFMISCBISO.IsChecked -eq $true) {
+        New-WindowsISO
+    } else {
+        Update-Log -Data 'ISO Creation skipped or not applicable' -Class Information
+    }
+
+    #Run Script when build complete
+    if (($WPFCustomCBRunScript.IsChecked -eq $True) -and ($WPFCustomCBScriptTiming.SelectedItem -eq 'On build completion')) {
+        Start-Script -file $WPFCustomTBFile.text -parameter $WPFCustomTBParameters.text
+    }
+
+    #Clear out staging folder
+    try {
+        Update-Log -Data 'Clearing staging folder...' -Class Information
+        Remove-Item $PSScriptRoot\staging\* -Force -Recurse -ErrorAction Stop
+    } catch {
+        Update-Log -Data 'Could not clear staging folder' -Class Warning
+        Update-Log -data $_.Exception.Message -class Error
+    }
+
+    #Copy log here
+    try {
+        Update-Log -Data 'Copying build log to target folder' -Class Information
+        Copy-Item -Path $PSScriptRoot\logging\WIMWitch.log -Destination $WPFMISWimFolderTextBox.Text -ErrorAction Stop
+        $logold = $WPFMISWimFolderTextBox.Text + '\WIMWitch.log'
+        $lognew = $WPFMISWimFolderTextBox.Text + '\' + $WPFMISWimNameTextBox.Text + '.log'
+        #Put log detection code here
+        if ((Test-Path -Path $lognew) -eq $true) {
+            Update-Log -Data 'A preexisting log file contains the same name. Renaming old log...' -Class Warning
+            Rename-Name -file $lognew -extension '.log'
+        }
+
+        #Put log detection code here
+        Rename-Item $logold -NewName $lognew -Force -ErrorAction Stop
+        Update-Log -Data 'Log copied successfully' -Class Information
+    } catch {
+        Update-Log -data $_.Exception.Message -class Error
+        Update-Log -data "The log file couldn't be copied and renamed. You can still snag it from the source." -Class Error
+        Update-Log -Data "Job's done." -Class Information
+        return
+    }
+    Update-Log -Data "Job's done." -Class Information
+}
+
 #endregion Functions
 
 #region Main
