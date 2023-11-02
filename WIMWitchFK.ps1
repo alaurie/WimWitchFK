@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 3.4.6
+.VERSION 3.4.7
 
 .GUID ee1ba506-ac68-45f8-9f37-4555f1902353
 
@@ -36,6 +36,9 @@
  Image (WIM) files and ISOs. It can also create WIM configuration templates and
  apply them either with the GUI or programatically for bulk creation. WIM Witch
  works as a stand alone tool, as well as integrating with Configuration Manager
+
+-version 3.4.7
+Add Windows 11 23H2 support
 
 -version 3.4.6
 General formatting tidy up.
@@ -181,7 +184,7 @@ Param(
     [string]$Win10Version = 'none',
 
     [parameter(mandatory = $false, HelpMessage = 'Win11 Version')]
-    [ValidateSet('all', '21H2', '22H2')]
+    [ValidateSet('all', '21H2', '22H2', '23H2')]
     [string]$Win11Version = 'none',
 
     [parameter(mandatory = $false, HelpMessage = 'Windows Server 2016')]
@@ -208,7 +211,7 @@ Param(
 
 )
 
-$WWScriptVer = '3.4.6'
+$WWScriptVer = '3.4.7'
 
 #region XAML
 #Your XAML goes here
@@ -371,9 +374,10 @@ $inputXML = @"
                     <CheckBox x:Name="UpdatesW11Main" Content="Windows 11" HorizontalAlignment="Left" Margin="46,135,0,0" VerticalAlignment="Top"/>
                     <CheckBox x:Name="UpdatesS2022" Content="Windows Server 2022" HorizontalAlignment="Left" Margin="44,215,0,0" VerticalAlignment="Top"/>
                     <CheckBox x:Name="UpdatesW10_21h2" Content="21H2" HorizontalAlignment="Left" Margin="112,190,0,0" VerticalAlignment="Top" IsEnabled="False"/>
-                    <CheckBox x:Name="UpdatesW11_22h2" Content="22H2" HorizontalAlignment="Left" Margin="58,153,0,0" VerticalAlignment="Top" IsEnabled="False"/>
-                    <CheckBox x:Name="UpdatesW11_21h2" Content="21H2" HorizontalAlignment="Left" Margin="111,153,0,0" VerticalAlignment="Top" IsEnabled="False"/>
+                    <CheckBox x:Name="UpdatesW11_22h2" Content="22H2" HorizontalAlignment="Left" Margin="112,152,0,0" VerticalAlignment="Top" IsEnabled="False"/>
+                    <CheckBox x:Name="UpdatesW11_21h2" Content="21H2" HorizontalAlignment="Left" Margin="168,153,0,0" VerticalAlignment="Top" IsEnabled="False"/>
                     <CheckBox x:Name="UpdatesW10_22h2" Content="22H2" HorizontalAlignment="Left" Margin="58,190,0,0" VerticalAlignment="Top" IsEnabled="False"/>
+                    <CheckBox x:Name="UpdatesW11_23h2" Content="23H2" HorizontalAlignment="Left" Margin="58,152,0,0" VerticalAlignment="Top" IsEnabled="False"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Customizations" Height="20" MinWidth="100">
@@ -495,8 +499,7 @@ $inputXML = $inputXML -replace 'mc:Ignorable="d"', '' -replace 'x:N', 'N' -repla
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 try {
     $Form = [Windows.Markup.XamlReader]::Load( $reader )
-}
-catch {
+} catch {
     Write-Warning "Unable to parse XML, with error: $($Error[0])`n Ensure that there are NO SelectionChanged or TextChanged properties in your textboxes (PowerShell cannot process them)"
     throw
 }
@@ -542,7 +545,7 @@ Function Get-FormVariables {
 # Functions for Controls
 #===========================================================================
 
-#Funtion to select mounting directory
+#Function to select mounting directory
 Function Select-MountDir {
 
     Add-Type -AssemblyName System.Windows.Forms
@@ -559,7 +562,6 @@ Function Select-MountDir {
 Function Select-SourceWIM {
 
     $SourceWIM = New-Object System.Windows.Forms.OpenFileDialog -Property @{
-        #InitialDirectory = [Environment]::GetFolderPath('Desktop')
         InitialDirectory = "$PSScriptRoot\imports\wim"
         Filter           = 'WIM (*.wim)|'
     }
@@ -577,7 +579,6 @@ Function Select-SourceWIM {
     $ImageFull = @(Get-WindowsImage -ImagePath $WPFSourceWIMSelectWIMTextBox.text)
     $a = $ImageFull | Out-GridView -Title 'Choose an Image Index' -PassThru
     $IndexNumber = $a.ImageIndex
-    #write-host $IndexNumber
     if ($null -eq $indexnumber) {
         Update-Log -Data 'Index not selected. Reselect the WIM file to select an index' -Class Warning
         return
@@ -591,8 +592,7 @@ Function Import-WimInfo($IndexNumber, [switch]$SkipUserConfirmation) {
     try {
         #Gets WIM metadata to populate fields on the Source tab.
         $ImageInfo = Get-WindowsImage -ImagePath $WPFSourceWIMSelectWIMTextBox.text -Index $IndexNumber -ErrorAction Stop
-    }
-    catch {
+    } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -data 'The WIM file selected may be borked. Try a different one' -Class Warning
         Return
@@ -612,8 +612,7 @@ Function Import-WimInfo($IndexNumber, [switch]$SkipUserConfirmation) {
     $WPFSourceWimIndexTextBox.text = $ImageIndex
     if ($ImageInfo.Architecture -eq 9) {
         $WPFSourceWimArchTextBox.text = 'x64'
-    }
-    Else {
+    } Else {
         $WPFSourceWimArchTextBox.text = 'x86'
     }
     if ($WPFSourceWIMImgDesTextBox.text -like 'Windows Server*') {
@@ -625,8 +624,7 @@ Function Import-WimInfo($IndexNumber, [switch]$SkipUserConfirmation) {
         $WPFMISJSONTextBox.text = 'False'
         $WPFMISOneDriveCheckBox.IsChecked = $False
         $WPFMISOneDriveCheckBox.IsEnabled = $False
-    }
-    Else {
+    } Else {
         $WPFAppTab.IsEnabled = $True
         $WPFAutopilotTab.IsEnabled = $True
         $WPFMISOneDriveCheckBox.IsEnabled = $True
@@ -661,8 +659,7 @@ Function Invoke-ParseJSON($file) {
         $WPFCloudAssignedTenantDomain.Text = $autopilotinfo.CloudAssignedTenantDomain
         $WPFComment_File.text = $autopilotinfo.Comment_File
 
-    }
-    catch {
+    } catch {
         $WPFZtdCorrelationId.Text = 'Bad file. Try Again.'
         $WPFCloudAssignedTenantDomain.Text = 'Bad file. Try Again.'
         $WPFComment_File.text = 'Bad file. Try Again.'
@@ -709,13 +706,11 @@ Function Invoke-MakeItSo ($appx) {
         if (!(Test-Path "$PSScriptRoot\Staging" -PathType 'Any')) {
             New-Item -ItemType Directory -Force -Path $PSScriptRoot\Staging -ErrorAction Stop
             Update-Log -Data 'Path did not exist, but it does now' -Class Information -ErrorAction Stop
-        }
-        Else {
+        } Else {
             Remove-Item –Path $PSScriptRoot\Staging\* -Recurse -ErrorAction Stop
             Update-Log -Data 'The path existed, and it has been purged.' -Class Information -ErrorAction Stop
         }
-    }
-    catch {
+    } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -data "Something is wrong with folder $PSScriptRoot\Staging. Try deleting manually if it exists" -Class Error
         return
@@ -742,8 +737,7 @@ Function Invoke-MakeItSo ($appx) {
         if (Test-FreeSpace -eq 1) {
             Update-Log -Data 'Insufficient free space. Delete some files and try again' -Class Error
             return
-        }
-        else {
+        } else {
             Update-Log -Data 'There is sufficient free space.' -Class Information
         }
     }
@@ -754,8 +748,7 @@ Function Invoke-MakeItSo ($appx) {
 
     try {
         Copy-Item $WPFSourceWIMSelectWIMTextBox.Text -Destination "$PSScriptRoot\Staging" -ErrorAction Stop
-    }
-    catch {
+    } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -Data "The file couldn't be copied. No idea what happened" -class Error
         return
@@ -769,8 +762,7 @@ Function Invoke-MakeItSo ($appx) {
         $wimname = Get-Item -Path $PSScriptRoot\Staging\*.wim -ErrorAction Stop
         Rename-Item -Path $wimname -NewName $WPFMISWimNameTextBox.Text -ErrorAction Stop
         Update-Log -Data 'Copied source WIM has been renamed' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -data "The copied source file couldn't be renamed. This shouldn't have happened." -Class Error
         Update-Log -data "Go delete the WIM from $PSScriptRoot\Staging\, then try again" -Class Error
@@ -788,8 +780,7 @@ Function Invoke-MakeItSo ($appx) {
 
     try {
         Mount-WindowsImage -Path $WPFMISMountTextBox.Text -ImagePath $wimname -Index 1 -ErrorAction Stop | Out-Null
-    }
-    catch {
+    } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -data "The WIM couldn't be mounted. Make sure the mount directory is empty" -Class Error
         Update-Log -Data "and that it isn't an active mount point" -Class Error
@@ -834,22 +825,19 @@ Function Invoke-MakeItSo ($appx) {
     #Language Packs and FOD
     if ($WPFCustomCBLangPacks.IsChecked -eq $true) {
         Install-LanguagePacks
-    }
-    else {
+    } else {
         Update-Log -Data 'Language Packs Injection not selected. Skipping...'
     }
 
     if ($WPFCustomCBLEP.IsChecked -eq $true) {
         Install-LocalExperiencePack
-    }
-    else {
+    } else {
         Update-Log -Data 'Local Experience Packs not selected. Skipping...'
     }
 
     if ($WPFCustomCBFOD.IsChecked -eq $true) {
         Install-FeaturesOnDemand
-    }
-    else {
+    } else {
         Update-Log -Data 'Features On Demand not selected. Skipping...'
     }
 
@@ -862,8 +850,7 @@ Function Invoke-MakeItSo ($appx) {
         try {
             $autopilotdir = $WPFMISMountTextBox.Text + '\windows\Provisioning\Autopilot'
             Copy-Item $WPFJSONTextBox.Text -Destination $autopilotdir -ErrorAction Stop
-        }
-        catch {
+        } catch {
             Update-Log -data $_.Exception.Message -class Error
             Update-Log -data "JSON file couldn't be copied. Check to see if the correct SKU" -Class Error
             Update-Log -Data 'of Windows has been selected' -Class Error
@@ -871,8 +858,7 @@ Function Invoke-MakeItSo ($appx) {
             Update-Log -data 'I get around to handling that error more betterer' -Class Error
             return
         }
-    }
-    else {
+    } else {
         Update-Log -Data 'JSON not selected. Skipping JSON Injection' -Class Information
     }
 
@@ -883,32 +869,28 @@ Function Invoke-MakeItSo ($appx) {
         Start-DriverInjection -Folder $WPFDriverDir3TextBox.text
         Start-DriverInjection -Folder $WPFDriverDir4TextBox.text
         Start-DriverInjection -Folder $WPFDriverDir5TextBox.text
-    }
-    Else {
+    } Else {
         Update-Log -Data 'Drivers were not selected for injection. Skipping.' -Class Information
     }
 
     #Inject default application association XML
     if ($WPFCustomCBEnableApp.IsChecked -eq $true) {
         Install-DefaultApplicationAssociations
-    }
-    else {
+    } else {
         Update-Log -Data 'Default Application Association not selected. Skipping...' -Class Information
     }
 
     #Inject start menu layout
     if ($WPFCustomCBEnableStart.IsChecked -eq $true) {
         Install-StartLayout
-    }
-    else {
+    } else {
         Update-Log -Data 'Start Menu Layout injection not selected. Skipping...' -Class Information
     }
 
     #apply registry files
     if ($WPFCustomCBEnableRegistry.IsChecked -eq $true) {
         Install-RegistryFiles
-    }
-    else {
+    } else {
         Update-Log -Data 'Registry file injection not selected. Skipping...' -Class Information
     }
 
@@ -929,8 +911,7 @@ Function Invoke-MakeItSo ($appx) {
         if ($WPFUpdatesOptionalEnableCheckBox.IsChecked -eq $True) {
             Deploy-Updates -class 'Optional'
         }
-    }
-    else {
+    } else {
         Update-Log -Data 'Updates not enabled' -Class Information
     }
 
@@ -939,22 +920,19 @@ Function Invoke-MakeItSo ($appx) {
         $os = Get-WindowsType
         $build = Get-WinVersionNumber
 
-        if (($os -eq 'Windows 11') -and ($build -eq '22H2')) {
+        if (($os -eq 'Windows 11') -and ($build -eq '22H2') -or ($build -eq '23H2')) {
             Copy-OneDrivex64
-        }
-        else {
+        } else {
             Copy-OneDrive
         }
-    }
-    else {
+    } else {
         Update-Log -data 'OneDrive agent update skipped as it was not selected' -Class Information
     }
 
     #Remove AppX Packages
     if ($WPFAppxCheckBox.IsChecked -eq $true) {
         Remove-Appx -array $appx
-    }
-    Else {
+    } Else {
         Update-Log -Data 'App removal not enabled' -Class Information
     }
 
@@ -984,8 +962,7 @@ Function Invoke-MakeItSo ($appx) {
         Copy-Item $PSScriptRoot\logging\WIMWitch.log -Destination $mountlogdir -ErrorAction Stop
         $CopyLogExist = Test-Path $mountlogdir\WIMWitch.log -PathType Leaf
         if ($CopyLogExist -eq $true) { Update-Log -Data 'Log filed copied successfully' -Class Information }
-    }
-    catch {
+    } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -data "Coudn't copy the log file to the mounted image." -class Error
     }
@@ -994,8 +971,7 @@ Function Invoke-MakeItSo ($appx) {
     Update-Log -Data 'Dismounting WIM file, committing changes' -Class Information
     try {
         Dismount-WindowsImage -Path $WPFMISMountTextBox.Text -Save -ErrorAction Stop | Out-Null
-    }
-    catch {
+    } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -data "The WIM couldn't save. You will have to manually discard the" -Class Error
         Update-Log -data 'mounted image manually' -Class Error
@@ -1026,8 +1002,7 @@ Function Invoke-MakeItSo ($appx) {
         try {
             Update-Log -Data 'Exporting WIM file' -Class Information
             Export-WindowsImage -SourceImagePath $wimname -SourceIndex 1 -DestinationImagePath ($WPFMISWimFolderTextBox.Text + '\' + $WPFMISWimNameTextBox.Text) -DestinationName ('WW - ' + $WPFSourceWIMImgDesTextBox.text) | Out-Null
-        }
-        catch {
+        } catch {
             Update-Log -data $_.Exception.Message -class Error
             Update-Log -data "The WIM couldn't be exported. You can still retrieve it from staging path." -Class Error
             Update-Log -data 'The file will be deleted when the tool is rerun.' -Class Error
@@ -1053,32 +1028,28 @@ Function Invoke-MakeItSo ($appx) {
     #Apply Dynamic Update to media
     if ($WPFMISCBDynamicUpdates.IsChecked -eq $true) {
         Deploy-Updates -class 'Dynamic'
-    }
-    else {
+    } else {
         Update-Log -data 'Dynamic Updates skipped or not applicable' -Class Information
     }
 
     #Apply updates to the boot.wim file
     if ($WPFMISCBBootWIM.IsChecked -eq $true) {
         Update-BootWIM
-    }
-    else {
+    } else {
         Update-Log -data 'Updating Boot.WIM skipped or not applicable' -Class Information
     }
 
     #Copy upgrade package binaries if selected
     if ($WPFMISCBUpgradePackage.IsChecked -eq $true) {
         Copy-UpgradePackage
-    }
-    else {
+    } else {
         Update-Log -Data 'Upgrade Package skipped or not applicable' -Class Information
     }
 
     #Create ISO if selected
     if ($WPFMISCBISO.IsChecked -eq $true) {
         New-WindowsISO
-    }
-    else {
+    } else {
         Update-Log -Data 'ISO Creation skipped or not applicable' -Class Information
     }
 
@@ -1091,8 +1062,7 @@ Function Invoke-MakeItSo ($appx) {
     try {
         Update-Log -Data 'Clearing staging folder...' -Class Information
         Remove-Item $PSScriptRoot\staging\* -Force -Recurse -ErrorAction Stop
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Could not clear staging folder' -Class Warning
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -1112,8 +1082,7 @@ Function Invoke-MakeItSo ($appx) {
         #Put log detection code here
         Rename-Item $logold -NewName $lognew -Force -ErrorAction Stop
         Update-Log -Data 'Log copied successfully' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data $_.Exception.Message -class Error
         Update-Log -data "The log file couldn't be copied and renamed. You can still snag it from the source." -Class Error
         Update-Log -Data "Job's done." -Class Information
@@ -1195,8 +1164,7 @@ Function Set-Logging {
     if (!(Test-Path -Path $PSScriptRoot\logging\WIMWitch.Log -PathType Leaf)) {
         New-Item -ItemType Directory -Force -Path $PSScriptRoot\Logging | Out-Null
         New-Item -Path $PSScriptRoot\logging -Name 'WIMWitch.log' -ItemType 'file' -Value '***Logging Started***' | Out-Null
-    }
-    Else {
+    } Else {
         Remove-Item -Path $PSScriptRoot\logging\WIMWitch.log
         New-Item -Path $PSScriptRoot\logging -Name 'WIMWitch.log' -ItemType 'file' -Value '***Logging Started***' | Out-Null
     }
@@ -1258,8 +1226,7 @@ Function Install-Driver($drivertoapply) {
     try {
         Add-WindowsDriver -Path $WPFMISMountTextBox.Text -Driver $drivertoapply -ErrorAction Stop | Out-Null
         Update-Log -Data "Applied $drivertoapply" -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data "Couldn't apply $drivertoapply" -Class Warning
     }
 
@@ -1285,8 +1252,7 @@ Function Get-OSDBInstallation {
     Update-Log -Data 'Getting OSD Installation information' -Class Information
     try {
         Import-Module -Name OSDUpdate -ErrorAction Stop
-    }
-    catch {
+    } catch {
         $WPFUpdatesOSDBVersion.Text = 'Not Installed.'
         Update-Log -Data 'OSD Update is not installed.' -Class Warning
         Return
@@ -1297,8 +1263,7 @@ Function Get-OSDBInstallation {
         $text = $osdbversion.version
         Update-Log -data "Installed version of OSD Update is $text." -Class Information
         Return
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Unable to fetch OSD Update version.' -Class Error
         Return
     }
@@ -1310,8 +1275,7 @@ Function Get-OSDSUSInstallation {
     Update-Log -Data 'Getting OSDSUS Installation information' -Class 'Information'
     try {
         Import-Module -Name OSDSUS -ErrorAction Stop
-    }
-    catch {
+    } catch {
         $WPFUpdatesOSDSUSVersion.Text = 'Not Installed'
 
         Update-Log -Data 'OSDSUS is not installed.' -Class Warning
@@ -1323,8 +1287,7 @@ Function Get-OSDSUSInstallation {
         $text = $osdsusversion.version
         Update-Log -data "Installed version of OSDSUS is $text." -Class Information
         Return
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Unable to fetch OSDSUS version.' -Class Error
         Return
     }
@@ -1339,8 +1302,7 @@ Function Get-OSDBCurrentVer {
         $text = $OSDBCurrentVer.version
         Update-Log -data "$text is the most current version" -class Information
         Return
-    }
-    catch {
+    } catch {
         $WPFUpdatesOSDBCurrentVerTextBox.Text = 'Network Error'
         Return
     }
@@ -1355,8 +1317,7 @@ Function Get-OSDSUSCurrentVer {
         $text = $OSDSUSCurrentVer.version
         Update-Log -data "$text is the most current version" -class Information
         Return
-    }
-    catch {
+    } catch {
         $WPFUpdatesOSDSUSCurrentVerTextBox.Text = 'Network Error'
         Return
     }
@@ -1379,8 +1340,7 @@ Function Update-OSDB {
             #$WPFUpdatesOSDBClosePowerShellTextBlock.visibility = "Visible"
             $WPFUpdatesOSDListBox.items.add('Please close all PowerShell windows, including WIM Witch, then relaunch app to continue')
             Return
-        }
-        catch {
+        } catch {
             $WPFUpdatesOSDBVersion.Text = 'Inst Fail'
             Update-Log -Data "Couldn't install OSD Update" -Class Error
             Update-Log -data $_.Exception.Message -class Error
@@ -1401,8 +1361,7 @@ Function Update-OSDB {
 
             get-OSDBInstallation
             return
-        }
-        catch {
+        } catch {
             $WPFUpdatesOSDBCurrentVerTextBox.Text = 'OSDB Err'
             Return
         }
@@ -1424,8 +1383,7 @@ Function Update-OSDSUS {
             #$WPFUpdatesOSDBClosePowerShellTextBlock.visibility = "Visible"
             $WPFUpdatesOSDListBox.items.add('Please close all PowerShell windows, including WIM Witch, then relaunch app to continue')
             Return
-        }
-        catch {
+        } catch {
             $WPFUpdatesOSDSUSVersion.Text = 'Inst Fail'
             Update-Log -Data "Couldn't install OSDSUS" -Class Error
             Update-Log -data $_.Exception.Message -class Error
@@ -1446,8 +1404,7 @@ Function Update-OSDSUS {
             $WPFUpdatesOSDListBox.items.add('Please close all PowerShell windows, including WIM Witch, then relaunch app to continue')
             get-OSDSUSInstallation
             return
-        }
-        catch {
+        } catch {
             $WPFUpdatesOSDSUSCurrentVerTextBox.Text = 'OSDSUS Err'
             Return
         }
@@ -1523,8 +1480,7 @@ Function Test-Superceded($action, $OS, $Build) {
 
                         Return
                     }
-                }
-                else {
+                } else {
                     Update-Log -data "$file is still current" -Class Information
                 }
             }
@@ -1542,8 +1498,7 @@ Function Get-WindowsPatches($build, $OS) {
     Update-Log -Data "Downloading SSU updates for $OS $build" -Class Information
     try {
         Get-OSDUpdate -ErrorAction Stop | Where-Object { $_.UpdateOS -eq $OS -and $_.UpdateArch -eq 'x64' -and $_.UpdateBuild -eq $build -and $_.UpdateGroup -eq 'SSU' } | Get-DownOSDUpdate -DownloadPath $PSScriptRoot\updates\$OS\$build\SSU
-    }
-    catch {
+    } catch {
         Update-Log -data 'Failed to download SSU update' -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -1551,8 +1506,7 @@ Function Get-WindowsPatches($build, $OS) {
     Update-Log -Data "Downloading AdobeSU updates for $OS $build" -Class Information
     try {
         Get-OSDUpdate -ErrorAction Stop | Where-Object { $_.UpdateOS -eq $OS -and $_.UpdateArch -eq 'x64' -and $_.UpdateBuild -eq $build -and $_.UpdateGroup -eq 'AdobeSU' } | Get-DownOSDUpdate -DownloadPath $PSScriptRoot\updates\$OS\$build\AdobeSU
-    }
-    catch {
+    } catch {
         Update-Log -data 'Failed to download AdobeSU update' -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -1560,16 +1514,14 @@ Function Get-WindowsPatches($build, $OS) {
     Update-Log -Data "Downloading LCU updates for $OS $build" -Class Information
     try {
         Get-OSDUpdate -ErrorAction Stop | Where-Object { $_.UpdateOS -eq $OS -and $_.UpdateArch -eq 'x64' -and $_.UpdateBuild -eq $build -and $_.UpdateGroup -eq 'LCU' } | Get-DownOSDUpdate -DownloadPath $PSScriptRoot\updates\$OS\$build\LCU
-    }
-    catch {
+    } catch {
         Update-Log -data 'Failed to download LCU update' -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
     Update-Log -Data "Downloading .Net updates for $OS $build" -Class Information
     try {
         Get-OSDUpdate -ErrorAction Stop | Where-Object { $_.UpdateOS -eq $OS -and $_.UpdateArch -eq 'x64' -and $_.UpdateBuild -eq $build -and $_.UpdateGroup -eq 'DotNet' } | Get-DownOSDUpdate -DownloadPath $PSScriptRoot\updates\$OS\$build\DotNet
-    }
-    catch {
+    } catch {
         Update-Log -data 'Failed to download .Net update' -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -1577,8 +1529,7 @@ Function Get-WindowsPatches($build, $OS) {
     Update-Log -Data "Downloading .Net CU updates for $OS $build" -Class Information
     try {
         Get-OSDUpdate -ErrorAction Stop | Where-Object { $_.UpdateOS -eq $OS -and $_.UpdateArch -eq 'x64' -and $_.UpdateBuild -eq $build -and $_.UpdateGroup -eq 'DotNetCU' } | Get-DownOSDUpdate -DownloadPath $PSScriptRoot\updates\$OS\$build\DotNetCU
-    }
-    catch {
+    } catch {
         Update-Log -data 'Failed to download .Net CU update' -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -1587,8 +1538,7 @@ Function Get-WindowsPatches($build, $OS) {
         try {
             Update-Log -Data "Downloading optional updates for $OS $build" -Class Information
             Get-OSDUpdate -ErrorAction Stop | Where-Object { $_.UpdateOS -eq $OS -and $_.UpdateArch -eq 'x64' -and $_.UpdateBuild -eq $build -and $_.UpdateGroup -eq 'Optional' } | Get-DownOSDUpdate -DownloadPath $PSScriptRoot\updates\$OS\$build\Optional
-        }
-        catch {
+        } catch {
             Update-Log -data 'Failed to download optional update' -Class Error
             Update-Log -data $_.Exception.Message -class Error
         }
@@ -1598,8 +1548,7 @@ Function Get-WindowsPatches($build, $OS) {
         try {
             Update-Log -Data "Downloading dynamic updates for $OS $build" -Class Information
             Get-OSDUpdate -ErrorAction Stop | Where-Object { $_.UpdateOS -eq $OS -and $_.UpdateArch -eq 'x64' -and $_.UpdateBuild -eq $build -and $_.UpdateGroup -eq 'SetupDU' } | Get-DownOSDUpdate -DownloadPath $PSScriptRoot\updates\$OS\$build\Dynamic
-        }
-        catch {
+        } catch {
             Update-Log -data 'Failed to download dynamic update' -Class Error
             Update-Log -data $_.Exception.Message -class Error
         }
@@ -1683,6 +1632,12 @@ Function Update-PatchSource {
                 Write-Host '21H2'
                 Test-Superceded -action delete -build 21H2 -OS 'Windows 11'
                 Get-WindowsPatches -build 21H2 -OS 'Windows 11'
+            }
+            
+            if ($WPFUpdatesW11_23h2.IsChecked -eq $true) {
+                Write-Host '23H2'
+                Test-Superceded -action delete -build 23H2 -OS 'Windows 11'
+                Get-WindowsPatches -build 23H2 -OS 'Windows 11'
 
             }
 
@@ -1755,10 +1710,10 @@ Function Update-PatchSource {
                 Invoke-MEMCMUpdateSupersedence -prod 'Windows 11' -Ver '22H2'
                 Invoke-MEMCMUpdatecatalog -prod 'Windows 11' -ver '22H2'
             }
-
-            #Invoke-MEMCMUpdateSupersedence -prod "Windows 11" -Ver "21H2"
-            #Invoke-MEMCMUpdatecatalog -prod "Windows 11" -Ver "21H2"
-            #Get-OneDrive
+            if ($WPFUpdatesW11_23H2.IsChecked -eq $true) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 11' -Ver '23H2'
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 11' -ver '23H2'
+            }
         }
         Get-OneDrive
     }
@@ -1919,15 +1874,13 @@ Function Deploy-Updates($class) {
                     #write-host $text
                     Start-Process -FilePath c:\windows\system32\expand.exe -args @("`"$text`"", '-F:*', "`"$mediafolder`"") -Wait
                 }
-            }
-            elseif ($IsPE -eq $true) { Add-WindowsPackage -Path ($PSScriptRoot + '\staging\mount') -PackagePath $compound -ErrorAction stop | Out-Null }
+            } elseif ($IsPE -eq $true) { Add-WindowsPackage -Path ($PSScriptRoot + '\staging\mount') -PackagePath $compound -ErrorAction stop | Out-Null }
             else {
                 if ($class -eq 'LCU') {
                     if (($os -eq 'Windows 10') -and (($buildnum -eq '2004') -or ($buildnum -eq '2009') -or ($buildnum -eq '20H2') -or ($buildnum -eq '21H1') -or ($buildnum -eq '21H2') -or ($buildnum -eq '22H2'))) {
                         Update-Log -data 'Processing the LCU package to retrieve SSU...' -class information
                         Deploy-LCU -packagepath $compound
-                    }
-                    elseif ($os -eq 'Windows 11') {
+                    } elseif ($os -eq 'Windows 11') {
                         Update-Log -data 'Windows 11 required LCU modification started...' -Class Information
                         Deploy-LCU -packagepath $compound
                     }
@@ -1941,8 +1894,7 @@ Function Deploy-Updates($class) {
                 else { Add-WindowsPackage -Path $WPFMISMountTextBox.Text -PackagePath $compound -ErrorAction stop | Out-Null }
 
             }
-        }
-        catch {
+        } catch {
             Update-Log -data 'Failed to apply update' -class Warning
             Update-Log -data $_.Exception.Message -class Warning
         }
@@ -2422,6 +2374,7 @@ Function Select-Appx {
     if ($OS -eq 'Windows 11') {
         if ($buildnum -eq '21H2') { $exappxs = Write-Output $appxWin11_21H2 | Out-GridView -Title 'Select apps to remove' -PassThru }
         if ($buildnum -eq '22H2') { $exappxs = Write-Output $appxWin11_22H2 | Out-GridView -Title 'Select apps to remove' -PassThru }
+        if ($buildnum -eq '23H2') { $exappxs = Write-Output $appxWin11_23H2 | Out-GridView -Title 'Select apps to remove' -PassThru }
     }
 
     if ($null -eq $exappxs) {
@@ -2446,8 +2399,7 @@ Function Remove-Appx($array) {
         try {
             Remove-AppxProvisionedPackage -Path $WPFMISMountTextBox.Text -PackageName $exappx -ErrorAction Stop | Out-Null
             Update-Log -data "Removing $exappx" -Class Information
-        }
-        catch {
+        } catch {
             Update-Log -Data "Failed to remove $exappx" -Class Error
             Update-Log -Data $_.Exception.Message -Class Error
         }
@@ -2467,8 +2419,7 @@ Function Remove-OSIndex {
         Update-Log -data "$Index is being evaluated"
         If ($Index -eq $IndexSelected) {
             Update-Log -Data "$Index is the index we want to keep. Skipping." -Class Information | Out-Null
-        }
-        else {
+        } else {
             Update-Log -data "Deleting $Index from WIM" -Class Information
             Remove-WindowsImage -ImagePath $wimname -Name $Index -InformationAction SilentlyContinue | Out-Null
 
@@ -2508,8 +2459,7 @@ Function Get-WWAutopilotProfile($login, $path) {
     try {
         Import-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -ErrorAction Stop
         Update-Log -Data 'NuGet is installed' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data 'NuGet is not installed. Installing now...' -Class Warning
         Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
         Update-Log -data 'NuGet is now installed' -Class Information
@@ -2519,8 +2469,7 @@ Function Get-WWAutopilotProfile($login, $path) {
 
         Import-Module -Name AzureAD -ErrorAction Stop | Out-Null
         Update-Log -data 'AzureAD Module is installed' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data 'AzureAD Module is not installed. Installing now...' -Class Warning
         Install-Module AzureAD -Force
         Update-Log -data 'AzureAD is now installed' -class Information
@@ -2530,8 +2479,7 @@ Function Get-WWAutopilotProfile($login, $path) {
 
         Import-Module -Name WindowsAutopilotIntune -ErrorAction Stop
         Update-Log -data 'WindowsAutopilotIntune module is installed' -Class Information
-    }
-    catch {
+    } catch {
 
         Update-Log -data 'WindowsAutopilotIntune module is not installed. Installing now...' -Class Warning
         Install-Module WindowsAutopilotIntune -Force
@@ -2545,8 +2493,7 @@ Function Get-WWAutopilotProfile($login, $path) {
 
     if ($AutopilotInstalledVer -eq $AutopilotLatestVersion) {
         Update-Log -data 'WindowsAutopilotIntune module is current. Continuing...' -Class Information
-    }
-    else {
+    } else {
         Update-Log -data 'WindowsAutopilotIntune module is out of date. Prompting the user to upgrade...'
         $UpgradeAutopilot = ([System.Windows.MessageBox]::Show("Would you like to update the WindowsAutopilotIntune module to version $AutopilotLatestVersion now?", 'Update Autopilot Module?', 'YesNo', 'warning'))
     }
@@ -2554,8 +2501,7 @@ Function Get-WWAutopilotProfile($login, $path) {
     if ($UpgradeAutopilot -eq 'Yes') {
         Update-Log -Data 'User has chosen to update WindowsAutopilotIntune module' -Class Warning
         Update-Autopilot
-    }
-    elseif ($AutopilotInstalledVer -ne $AutopilotLatestVersion) {
+    } elseif ($AutopilotInstalledVer -ne $AutopilotLatestVersion) {
         Update-Log -data 'User declined to update WindowsAutopilotIntune module. Continuing...' -Class Warning
     }
 
@@ -2659,12 +2605,10 @@ Function Save-Configuration {
         try {
             $CurrentConfig | Export-Clixml -Path $PSScriptRoot\Configs\$filename -ErrorAction Stop
             Update-Log -data 'file saved' -Class Information
-        }
-        catch {
+        } catch {
             Update-Log -data "Couldn't save file" -Class Error
         }
-    }
-    else {
+    } else {
         Update-Log -data "Saving ConfigMgr Image info for Package $filename" -Class Information
 
         $CurrentConfig.CMPackageID = $filename
@@ -2677,16 +2621,14 @@ Function Save-Configuration {
 
             try {
                 New-Item -ItemType Directory -Path $PSScriptRoot\ConfigMgr\PackageInfo -ErrorAction Stop
-            }
-            catch {
+            } catch {
                 Update-Log -Data "Couldn't create the folder. Likely a permission issue" -Class Error
             }
         }
         try {
             $CurrentConfig | Export-Clixml -Path $PSScriptRoot\ConfigMgr\PackageInfo\$filename -Force -ErrorAction Stop
             Update-Log -data 'file saved' -Class Information
-        }
-        catch {
+        } catch {
             Update-Log -data "Couldn't save file" -Class Error
         }
     }
@@ -3018,8 +2960,7 @@ Function Rename-Name($file, $extension) {
         Rename-Item -Path $file -NewName $filename -ErrorAction Stop
         $text = $file + ' has been renamed to ' + $filename
         Update-Log -Data $text -Class Warning
-    }
-    catch {
+    } catch {
         Update-Log -data "Couldn't rename file. Stopping..." -force -Class Error
         return 'stop'
     }
@@ -3184,8 +3125,7 @@ Function Import-ISO {
         if ((Test-Path -Path $PSScriptRoot\Imports\WIM\$newname) -eq $true) {
             Update-Log -Data 'Destination WIM name already exists. Provide a new name and try again.' -Class Error
             return
-        }
-        else {
+        } else {
             Update-Log -Data 'Name appears to be good. Continuing...' -Class Information
         }
     }
@@ -3196,8 +3136,7 @@ Function Import-ISO {
         $isomount = Mount-DiskImage -ImagePath $file -PassThru -NoDriveLetter -ErrorAction Stop
         $iso = $isomount.devicepath
 
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Could not mount the ISO! Stopping actions...' -Class Error
         return
     }
@@ -3205,8 +3144,7 @@ Function Import-ISO {
         Update-Log -Data 'Could not access the mounted ISO! Stopping actions...' -Class Error
         try {
             Invoke-RemoveISOMount -inputObject $isomount
-        }
-        catch {
+        } catch {
             Update-Log -Data 'Attempted to dismount iso - might have failed...' -Class Warning
         }
         return
@@ -3215,17 +3153,14 @@ Function Import-ISO {
     #Testing for ESD or WIM format
     if (Test-Path -Path (Join-Path $iso '\sources\install.wim')) {
         $installWimFound = $true
-    }
-    elseif (Test-Path -Path (Join-Path $iso '\sources\install.esd')) {
+    } elseif (Test-Path -Path (Join-Path $iso '\sources\install.esd')) {
         $installEsdFound = $true
         Update-Log -data 'Found ESD type installer - attempting to convert to WIM.' -Class Information
-    }
-    else {
+    } else {
         Update-Log -data 'Error accessing install.wim or install.esd! Breaking' -Class Warning
         try {
             Invoke-RemoveISOMount -inputObject $isomount
-        }
-        catch {
+        } catch {
             Update-Log -Data 'Attempted to dismount iso - might have failed...' -Class Warning
         }
         return
@@ -3234,8 +3169,7 @@ Function Import-ISO {
     try {
         if ($installWimFound) {
             $windowsver = Get-WindowsImage -ImagePath (Join-Path $iso '\sources\install.wim') -Index 1 -ErrorAction Stop
-        }
-        elseif ($installEsdFound) {
+        } elseif ($installEsdFound) {
             $windowsver = Get-WindowsImage -ImagePath (Join-Path $iso '\sources\install.esd') -Index 1 -ErrorAction Stop
         }
 
@@ -3250,8 +3184,7 @@ Function Import-ISO {
             if ($null -eq $global:Win10VerDet) {
                 Write-Host 'cancelling'
                 return
-            }
-            else {
+            } else {
                 $version = $global:Win10VerDet
                 $global:Win10VerDet = $null
             }
@@ -3260,8 +3193,7 @@ Function Import-ISO {
             Write-Host $version
         }
 
-    }
-    catch {
+    } catch {
         Update-Log -data 'install.wim could not be found or accessed! Skipping...' -Class Warning
         $installWimFound = $false
     }
@@ -3280,8 +3212,7 @@ Function Import-ISO {
                 Update-Log -Data 'Copying WIM file to the staging folder...' -Class Information
                 Copy-Item -Path $iso\sources\install.wim -Destination $PSScriptRoot\staging -Force -ErrorAction Stop -PassThru
             }
-        }
-        catch {
+        } catch {
             Update-Log -data "Couldn't copy from the source" -Class Error
             Invoke-RemoveISOMount -inputObject $isomount
             return
@@ -3297,8 +3228,7 @@ Function Import-ISO {
                 try {
                     Update-Log -Data "Converting index $($index.ImageIndex) - $($index.ImageName)" -Class Information
                     Export-WindowsImage -SourceImagePath $sourceEsdFile -SourceIndex $($index.ImageIndex) -DestinationImagePath (Join-Path $PSScriptRoot '\staging\install.wim') -CompressionType fast -ErrorAction Stop
-                }
-                catch {
+                } catch {
                     Update-Log -Data "Converting index $($index.ImageIndex) failed - skipping..." -Class Error
                     continue
                 }
@@ -3315,8 +3245,7 @@ Function Import-ISO {
             $text = 'Renaming install.wim to ' + $newname
             Update-Log -Data $text -Class Information
             Rename-Item -Path $PSScriptRoot\Staging\install.wim -NewName $newname -ErrorAction Stop
-        }
-        catch {
+        } catch {
             Update-Log -data "Couldn't rename the copied file. Most likely a weird permissions issues." -Class Error
             Invoke-RemoveISOMount -inputObject $isomount
             return
@@ -3327,8 +3256,7 @@ Function Import-ISO {
         try {
             Update-Log -data "Moving $newname to imports folder..." -Class Information
             Move-Item -Path $PSScriptRoot\Staging\$newname -Destination $PSScriptRoot\Imports\WIM -ErrorAction Stop
-        }
-        catch {
+        } catch {
             Update-Log -Data "Couldn't move the new WIM to the staging folder." -Class Error
             Invoke-RemoveISOMount -inputObject $isomount
             return
@@ -3353,8 +3281,7 @@ Function Import-ISO {
 
                 New-Item -Path (Split-Path -Path $path -Parent) -Name $version -ItemType Directory -ErrorAction stop | Out-Null
 
-            }
-            catch {
+            } catch {
                 Update-Log -Data "Couldn't creating new folder in DotNet imports folder" -Class Error
                 return
             }
@@ -3365,8 +3292,7 @@ Function Import-ISO {
             Update-Log -Data 'Copying .Net binaries...' -Class Information
             Copy-Item -Path $iso\sources\sxs\*netfx3* -Destination $path -Force -ErrorAction Stop
 
-        }
-        catch {
+        } catch {
             Update-Log -Data "Couldn't copy the .Net binaries" -Class Error
             return
         }
@@ -3412,8 +3338,7 @@ Function Import-ISO {
     try {
         Update-Log -Data 'Dismount!' -Class Information
         Invoke-RemoveISOMount -inputObject $isomount
-    }
-    catch {
+    } catch {
         Update-Log -Data "Couldn't dismount the ISO. WIM Witch uses a file mount option that does not" -Class Error
         Update-Log -Data 'provision a drive letter. Use the Dismount-DiskImage command to manaully dismount.' -Class Error
     }
@@ -3456,8 +3381,7 @@ Function Add-DotNet {
         $text = 'Injecting .Net 3.5 binaries from ' + $DotNetFiles
         Update-Log -Data $text -Class Information
         Add-WindowsPackage -PackagePath $DotNetFiles -Path $WPFMISMountTextBox.Text -ErrorAction Continue | Out-Null
-    }
-    catch {
+    } catch {
         Update-Log -Data "Couldn't inject .Net Binaries" -Class Warning
         Update-Log -data $_.Exception.Message -Class Error
         return
@@ -3510,8 +3434,7 @@ Function Install-WimWitchUpgrade {
             Write-Output 'New version has been applied. WIM Witch will now exit.'
             Write-Output 'Please restart WIM Witch'
             exit
-        }
-        catch {
+        } catch {
             Write-Output "Couldn't upgrade. Try again when teh tubes are clear"
             return
         }
@@ -3537,8 +3460,7 @@ Function Test-WIMWitchVer {
     try {
         $WWCurrentVer = (Find-Script -Name 'WIMWitch' -ErrorAction Stop).version
         Update-Log -Data "The latest version from the Gallery is $WWCurrentVer" -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data "Couldn't retreive script info from the PowerShell Gallery" -Class Warning
         Update-Log -data 'Try rebooting the internet and trying again' -Class Warning
         Update-Log -data 'Continuing on with loading WIM Witch...' -Class Warning
@@ -3570,8 +3492,7 @@ Function Backup-WIMWitch {
         Update-Log -data 'Copy script to backup folder...' -Class Information
         Copy-Item -Path $scriptname -Destination $PSScriptRoot\backup -ErrorAction Stop
         Update-Log -Data 'Successfully copied...' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data "Couldn't copy the WIM Witch script. My guess is a permissions issue" -Class Error
         Update-Log -Data 'Exiting out of an over abundance of caution' -Class Error
         exit
@@ -3581,8 +3502,7 @@ Function Backup-WIMWitch {
         Update-Log -data 'Renaming archived script...' -Class Information
         Rename-Name -file $PSScriptRoot\backup\$scriptname -extension '.ps1'
         Update-Log -data 'Backup successfully renamed for archiving' -class Information
-    }
-    catch {
+    } catch {
 
         Update-Log -Data "Backed-up script couldn't be renamed. This isn't a critical error" -Class Warning
         Update-Log -Data "You may want to change it's name so it doesn't get overwritten." -Class Warning
@@ -3606,8 +3526,7 @@ Function Get-OneDrive {
     Invoke-WebRequest -Uri $DownloadUrl -OutFile "$DownloadPath\$DownloadFile"
     if (Test-Path "$DownloadPath\$DownloadFile") {
         Update-Log -Data 'OneDrive Download Complete' -Class Information
-    }
-    else {
+    } else {
         Update-log -Data 'OneDrive could not be downloaded' -Class Error
     }
 
@@ -3621,8 +3540,7 @@ Function Get-OneDrive {
     Invoke-WebRequest -Uri $DownloadUrl -OutFile "$DownloadPath\$DownloadFile"
     if (Test-Path "$DownloadPath\$DownloadFile") {
         Update-Log -Data 'OneDrive Download Complete' -Class Information
-    }
-    else {
+    } else {
         Update-log -Data 'OneDrive could not be downloaded' -Class Error
     }
 
@@ -3651,8 +3569,7 @@ Function Copy-OneDrive {
         Set-Acl "$mountpath\Windows\SysWOW64\OneDriveSetup.exe" $Acl -ErrorAction Stop | Out-Null
 
         Update-Log -Data 'ACL successfully updated. Continuing...'
-    }
-    catch {
+    } catch {
         Update-Log -data "Couldn't set the ACL on the original file" -Class Error
         return
     }
@@ -3663,8 +3580,7 @@ Function Copy-OneDrive {
         Update-Log -data 'Copying updated OneDrive agent installer...' -Class Information
         Copy-Item "$PSScriptRoot\updates\OneDrive\OneDriveSetup.exe" -Destination "$mountpath\Windows\SysWOW64" -Force -ErrorAction Stop
         Update-Log -Data 'OneDrive installer successfully copied.' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data "Couldn't copy the OneDrive installer file." -class Error
         Update-Log -data $_.Exception.Message -Class Error
         return
@@ -3674,8 +3590,7 @@ Function Copy-OneDrive {
         Update-Log -data 'Restoring original ACL to OneDrive installer.' -Class Information
         Set-Acl "$mountpath\Windows\SysWOW64\OneDriveSetup.exe" $AclBAK -ErrorAction Stop | Out-Null
         Update-Log -data 'Restoration complete' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log "Couldn't restore original ACLs. Continuing." -Class Error
     }
 }
@@ -3703,8 +3618,7 @@ Function Copy-OneDrivex64 {
         Set-Acl "$mountpath\Windows\System32\OneDriveSetup.exe" $Acl -ErrorAction Stop | Out-Null
 
         Update-Log -Data 'ACL successfully updated. Continuing...'
-    }
-    catch {
+    } catch {
         Update-Log -data "Couldn't set the ACL on the original file" -Class Error
         return
     }
@@ -3714,8 +3628,7 @@ Function Copy-OneDrivex64 {
         Update-Log -data 'Copying updated OneDrive agent installer...' -Class Information
         Copy-Item "$PSScriptRoot\updates\OneDrive\x64\OneDriveSetup.exe" -Destination "$mountpath\Windows\System32" -Force -ErrorAction Stop
         Update-Log -Data 'OneDrive installer successfully copied.' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data "Couldn't copy the OneDrive installer file." -class Error
         Update-Log -data $_.Exception.Message -Class Error
         return
@@ -3725,8 +3638,7 @@ Function Copy-OneDrivex64 {
         Update-Log -data 'Restoring original ACL to OneDrive installer.' -Class Information
         Set-Acl "$mountpath\Windows\System32\OneDriveSetup.exe" $AclBAK -ErrorAction Stop | Out-Null
         Update-Log -data 'Restoration complete' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log "Couldn't restore original ACLs. Continuing." -Class Error
     }
 }
@@ -5476,8 +5388,7 @@ Function Select-FeaturesOnDemand($winver, $WinOS) {
     if ($WinOS -eq 'Windows 11') {
         $items = (Get-ChildItem -Path "$PSScriptRoot\imports\fods\Windows 11\$winver" | Select-Object -Property Name | Out-GridView -Title 'Select Featres' -PassThru)
         foreach ($item in $items) { $WPFCustomLBFOD.Items.Add($item.name) }
-    }
-    else {
+    } else {
 
         foreach ($item in $items) { $WPFCustomLBFOD.Items.Add($item) }
     }
@@ -5508,14 +5419,12 @@ Function Install-LanguagePacks {
             if ($demomode -eq $true) {
                 $string = 'Demo mode active - not applying ' + $source
                 Update-Log -data $string -Class Warning
-            }
-            else {
+            } else {
                 Add-WindowsPackage -PackagePath $source -Path $mountdir -ErrorAction Stop | Out-Null
                 Update-Log -Data 'Injection Successful' -Class Information
             }
 
-        }
-        catch {
+        } catch {
             Update-Log -Data 'Failed to inject Language Pack' -Class Error
             Update-Log -data $_.Exception.Message -Class Error
         }
@@ -5547,8 +5456,7 @@ Function Install-LocalExperiencePack {
         try {
             Add-ProvisionedAppxPackage -PackagePath $file -LicensePath $license -Path $mountdir -ErrorAction Stop | Out-Null
             Update-Log -Data 'Injection Successful' -Class Information
-        }
-        catch {
+        } catch {
             Update-Log -data 'Failed to apply Local Experience Pack' -Class Error
             Update-Log -data $_.Exception.Message -Class Error
         }
@@ -5578,8 +5486,7 @@ Function Install-FeaturesOnDemand {
         try {
             Add-WindowsCapability -Path $mountdir -Name $item -Source $FODsource -ErrorAction Stop | Out-Null
             Update-Log -Data 'Injection Successful' -Class Information
-        }
-        catch {
+        } catch {
             Update-Log -data 'Failed to apply Feature On Demand' -Class Error
             Update-Log -data $_.Exception.Message -Class Error
         }
@@ -5744,8 +5651,7 @@ Function Start-Script($file, $parameter) {
         Update-Log -Data 'Running script' -Class Information
         Invoke-Expression -Command $string -ErrorAction Stop
         Update-Log -data 'Script complete' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Script failed' -Class Error
     }
 }
@@ -5804,8 +5710,7 @@ Function Get-ImageInfo {
     Update-Log -data 'Checking Binary Differential Replication setting' -Class Information
     if ($image.PkgFlags -eq ($image.PkgFlags -bor 0x04000000)) {
         $WPFCMCBBinDirRep.IsChecked = $True
-    }
-    else {
+    } else {
         $WPFCMCBBinDirRep.IsChecked = $False
     }
 
@@ -5813,8 +5718,7 @@ Function Get-ImageInfo {
     Update-Log -data 'Checking package share settings' -Class Information
     if ($image.PkgFlags -eq ($image.PkgFlags -bor 0x80)) {
         $WPFCMCBDeploymentShare.IsChecked = $true
-    }
-    else
+    } else
     { $WPFCMCBDeploymentShare.IsChecked = $false }
 
     Set-Location $PSScriptRoot
@@ -5846,8 +5750,7 @@ Function New-CMImagePackage {
     try {
         New-CMOperatingSystemImage -Name $WPFCMTBImageName.text -Path $Path -ErrorAction Stop
         Update-Log -data 'Image was created. Check ConfigMgr console' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data 'Failed to create the image' -Class Error
         Update-Log -data $_.Exception.Message -Class Error
     }
@@ -6147,8 +6050,7 @@ Function Invoke-MSUpdateItemDownload {
                         Update-Log -Data "Creating folder $variable" -Class Information
                         New-Item -Path $variable -ItemType Directory | Out-Null
                         Update-Log -data 'Created folder' -Class Information
-                    }
-                    else {
+                    } else {
                         $testpath = $variable + '\' + $PSObject.FileName
 
                         if ((Test-Path -Path $testpath) -eq $true) {
@@ -6167,24 +6069,20 @@ Function Invoke-MSUpdateItemDownload {
 
                         Update-Log -Data "Download completed successfully, renamed file to: $($PSObject.FileName)" -Class Information
                         $ReturnValue = 0
-                    }
-                    catch [System.Exception] {
+                    } catch [System.Exception] {
                         Update-Log -data "Unable to download update item content. Error message: $($_.Exception.Message)" -Class Error
                         $ReturnValue = 1
                     }
-                }
-                else {
+                } else {
                     Update-Log -data "Unable to determine update content instance for CI_ID: $($UpdateItemContentID.ContentID)" -Class Error
                     $ReturnValue = 1
                 }
             }
-        }
-        else {
+        } else {
             Update-Log -Data "Unable to determine ContentID instance for CI_ID: $($UpdateItem.CI_ID)" -Class Error
             $ReturnValue = 1
         }
-    }
-    else {
+    } else {
         Update-Log -data "Unable to locate update item from SMS Provider for update type: $($UpdateType)" -Class Error
         $ReturnValue = 2
     }
@@ -6304,8 +6202,7 @@ Function Invoke-MEMCMUpdateSupersedence($prod, $Ver) {
                 if ($UpdateItem.IsSuperseded -eq $false) {
 
                     Update-Log -data "Update $FolderSecondLevel is current" -Class Information
-                }
-                else {
+                } else {
                     Update-Log -Data "Update $UpdateCab is superseded. Deleting file..." -Class Warning
                     Remove-Item -Path "$PSScriptRoot\updates\$Prod\$ver\$FolderFirstLevel\$FolderSecondLevel\$UpdateCab"
                 }
@@ -6412,8 +6309,7 @@ Function Set-ImageProperties($PackageID) {
     if ($WPFCMCBBinDirRep.IsChecked -eq $true) {
         Update-Log -Data 'Enabling Binary Differential Replication' -Class Information
         Set-CMOperatingSystemImage -Id $PackageID -EnableBinaryDeltaReplication $true
-    }
-    else {
+    } else {
         Update-Log -Data 'Disabling Binary Differential Replication' -Class Information
         Set-CMOperatingSystemImage -Id $PackageID -EnableBinaryDeltaReplication $false
     }
@@ -6422,8 +6318,7 @@ Function Set-ImageProperties($PackageID) {
     if ($WPFCMCBDeploymentShare.IsChecked -eq $true) {
         Update-Log -Data 'Enabling Package Share' -Class Information
         Set-CMOperatingSystemImage -Id $PackageID -CopyToPackageShareOnDistributionPoint $true
-    }
-    else {
+    } else {
         Update-Log -Data 'Disabling Package Share' -Class Information
         Set-CMOperatingSystemImage -Id $PackageID -CopyToPackageShareOnDistributionPoint $false
     }
@@ -6462,8 +6357,7 @@ Function Find-ConfigManager() {
             }
 
             return 0
-        }
-        catch {
+        } catch {
             Update-Log -Data 'ConfigMgr not detected' -Class Information
             $WPFCMTBSiteServer.text = 'Not Detected'
             $WPFCMTBSitecode.text = 'Not Detected'
@@ -6596,8 +6490,7 @@ Function Install-StartLayout {
 
 
 
-    }
-    catch {
+    } catch {
         Update-Log -Data "Couldn't apply the start menu XML" -Class Error
         Update-Log -data $_.Exception.Message -Class Error
     }
@@ -6610,8 +6503,7 @@ Function Install-DefaultApplicationAssociations {
         "Dism.exe /image:$WPFMISMountTextBox.text /Import-DefaultAppAssociations:$WPFCustomTBDefaultApp.text"
         Update-log -data 'Default Application Association applied' -Class Information
 
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Could not apply Default Appklication Association XML...' -Class Error
         Update-Log -data $_.Exception.Message -Class Error
     }
@@ -6727,8 +6619,7 @@ Function Install-RegistryFiles {
         $Path = $WPFMISMountTextBox.text + '\Windows\System32\Config\SYSTEM'
         Update-Log -Data $path -Class Information
         Invoke-Command { reg load HKLM\OfflineSystem $Path } -ErrorAction Stop | Out-Null
-    }
-    catch {
+    } catch {
         Update-Log -Data "Failed to mount $Path" -Class Error
         Update-Log -data $_.Exception.Message -Class Error
     }
@@ -6747,8 +6638,7 @@ Function Install-RegistryFiles {
             $Destination = $PSScriptRoot + '\staging\'
             Update-Log -Data 'Copying file to staging folder...' -Class Information
             Copy-Item -Path $regfile -Destination $Destination -Force -ErrorAction Stop  #Copy Source Registry File to staging
-        }
-        Catch {
+        } Catch {
             Update-Log -Data "Couldn't copy reg file" -Class Error
             Update-Log -data $_.Exception.Message -Class Error
         }
@@ -6763,8 +6653,7 @@ Function Install-RegistryFiles {
            ((Get-Content -Path $regpath -Raw) -replace 'HKEY_LOCAL_MACHINE\\SOFTWARE', 'HKEY_LOCAL_MACHINE\OfflineSoftware') | Set-Content -Path $regpath -ErrorAction Stop
            ((Get-Content -Path $regpath -Raw) -replace 'HKEY_LOCAL_MACHINE\\SYSTEM', 'HKEY_LOCAL_MACHINE\OfflineSystem') | Set-Content -Path $regpath -ErrorAction Stop
            ((Get-Content -Path $regpath -Raw) -replace 'HKEY_USERS\\.DEFAULT', 'HKEY_LOCAL_MACHINE\OfflineDefault') | Set-Content -Path $regpath -ErrorAction Stop
-        }
-        Catch {
+        } Catch {
             Update-log -Data "Couldn't read or update reg file $regpath" -Class Error
             Update-Log -data $_.Exception.Message -Class Error
         }
@@ -6777,8 +6666,7 @@ Function Install-RegistryFiles {
             Update-Log -Data 'Importing registry file into mounted wim' -Class Information
             Start-Process reg -ArgumentList ('import', "`"$RegPath`"") -Wait -WindowStyle Hidden -ErrorAction stop
             Update-Log -Data 'Import successful' -Class Information
-        }
-        Catch {
+        } Catch {
             Update-Log -Data "Couldn't import $Regpath" -Class Error
             Update-Log -data $_.Exception.Message -Class Error
 
@@ -6794,8 +6682,7 @@ Function Install-RegistryFiles {
         Invoke-Command { reg unload HKLM\OfflineSoftware } -ErrorAction Stop | Out-Null
         Invoke-Command { reg unload HKLM\OfflineSystem } -ErrorAction Stop | Out-Null
         Update-Log -Data 'Dismount complete' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data "Couldn't dismount the registry hives" -Class Error
         Update-Log -Data 'This will prevent the Windows image from properly dismounting' -Class Error
         Update-Log -data $_.Exception.Message -Class Error
@@ -6828,8 +6715,7 @@ Function Copy-StageIsoMedia {
         Update-Log -Data 'Creating staging folder for media' -Class Information
         New-Item -Path $PSScriptRoot\staging -Name 'Media' -ItemType Directory -ErrorAction Stop | Out-Null
         Update-Log -Data 'Media staging folder has been created' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Could not create staging folder' -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -6839,8 +6725,7 @@ Function Copy-StageIsoMedia {
         Update-Log -data 'Staging media binaries...' -Class Information
         Copy-Item -Path $PSScriptRoot\imports\iso\$OS\$Ver\* -Destination $PSScriptRoot\staging\media -Force -Recurse -ErrorAction Stop
         Update-Log -data 'Media files have been staged' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Failed to stage media binaries...' -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -6876,8 +6761,7 @@ Function New-WindowsISO {
         # write-host $executable
         Start-Process $executable -args @("`"$text`"", '-pEF', '-u1', '-udfver102', "`"$source`"", "`"$dest`"") -Wait -ErrorAction Stop
         Update-Log -Data 'ISO has been built' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data "Couldn't create the ISO file" -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -6890,8 +6774,7 @@ Function Copy-UpgradePackage {
         Update-Log -data 'Copying updated media to Upgrade Package folder...' -Class Information
         Copy-Item -Path $PSScriptRoot\staging\media\* -Destination $WPFMISTBUpgradePackage.text -Force -Recurse -ErrorAction Stop
         Update-Log -Data 'Updated media has been copied' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data "Couldn't copy the updated media to the upgrade package folder" -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -6906,8 +6789,7 @@ Function Update-BootWIM {
         Update-Log -Data 'Creating mount point in staging folder...'
         New-Item -Path $PSScriptRoot\staging -Name 'mount' -ItemType Directory -ErrorAction Stop
         Update-Log -Data 'Staging folder mount point created successfully' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -data 'Failed to create the staging folder mount point' -Class Error
         Update-Log -data $_.Exception.Message -class Error
         return
@@ -6928,8 +6810,7 @@ Function Update-BootWIM {
             $text = 'Mounting PE image number ' + $BootImage.ImageIndex
             Update-Log -data $text -Class Information
             Mount-WindowsImage -ImagePath $PSScriptRoot\staging\media\sources\boot.wim -Path $PSScriptRoot\staging\mount -Index $BootImage.ImageIndex -ErrorAction Stop
-        }
-        catch {
+        } catch {
             Update-Log -Data 'Could not mount the boot.wim' -Class Error
             Update-Log -data $_.Exception.Message -class Error
             return
@@ -6944,8 +6825,7 @@ Function Update-BootWIM {
         try {
             Update-Log -data 'Dismounting Windows PE image...' -Class Information
             Dismount-WindowsImage -Path $PSScriptRoot\staging\mount -Save -ErrorAction Stop
-        }
-        catch {
+        } catch {
             Update-Log -data 'Could not dismount the winpe image.' -Class Error
             Update-Log -data $_.Exception.Message -class Error
         }
@@ -6954,8 +6834,7 @@ Function Update-BootWIM {
         Try {
             Update-Log -data 'Exporting WinPE image index...' -Class Information
             Export-WindowsImage -SourceImagePath $PSScriptRoot\staging\media\sources\boot.wim -SourceIndex $BootImage.ImageIndex -DestinationImagePath $PSScriptRoot\staging\tempboot.wim -ErrorAction Stop
-        }
-        catch {
+        } catch {
             Update-Log -Data 'Failed to export WinPE image' -Class Error
             Update-Log -data $_.Exception.Message -class Error
         }
@@ -6967,8 +6846,7 @@ Function Update-BootWIM {
         Update-Log -Data 'Overwriting boot.wim with updated and optimized version...' -Class Information
         Move-Item -Path $PSScriptRoot\staging\tempboot.wim -Destination $PSScriptRoot\staging\media\sources\boot.wim -Force -ErrorAction Stop
         Update-Log -Data 'Boot.WIM updated successfully' -Class Information
-    }
-    catch {
+    } catch {
         Update-Log -Data 'Could not copy the updated boot.wim' -Class Error
         Update-Log -data $_.Exception.Message -class Error
     }
@@ -6997,6 +6875,7 @@ Function Get-WinVersionNumber {
     If ($WPFSourceWimVerTextBox.text -like '10.0.19043.*') { $buildnum = '21H1' }
     If ($WPFSourceWimVerTextBox.text -like '10.0.19044.*') { $buildnum = '21H2' }
     If ($WPFSourceWimVerTextBox.text -like '10.0.22621.*') { $buildnum = '22H2' }
+    If ($WPFSourceWimVerTextBox.text -like '10.0.22621.24*') { $buildnum = '23H2' }
 
     If ($WPFSourceWimVerTextBox.text -like '10.0.19041.*') {
         $IsMountPoint = $False
@@ -7325,8 +7204,7 @@ Function Invoke-2XXXPreReq {
 
             try {
                 Invoke-WebRequest -Uri $KB_URI -OutFile "$PSScriptRoot\staging\extract_me.cab" -ErrorAction stop
-            }
-            catch {
+            } catch {
                 Update-Log -data 'Failed to download the update' -class Error
                 Update-Log -data $_.Exception.Message -Class Error
                 return 1
@@ -7339,8 +7217,7 @@ Function Invoke-2XXXPreReq {
                     Update-Log -data 'The folder for the required SSU does not exist. Creating it now...' -class Information
                     New-Item -Path "$PSScriptRoot\updates\Windows 10" -Name '2XXX_prereq' -ItemType Directory -ErrorAction stop | Out-Null
                     Update-Log -data 'The folder has been created' -class information
-                }
-                catch {
+                } catch {
                     Update-Log -data 'Could not create the required folder.' -class error
                     Update-Log -data $_.Exception.Message -Class Error
                     return 1
@@ -7351,8 +7228,7 @@ Function Invoke-2XXXPreReq {
                 Update-Log -data 'Extracting the SSU from the May 2021 LCU...' -class Information
                 Start-Process $executable -args @("`"$PSScriptRoot\staging\extract_me.cab`"", '/f:*SSU*.CAB', "`"$PSScriptRoot\updates\Windows 10\2XXX_prereq`"") -Wait -ErrorAction Stop
                 Update-Log 'Extraction of SSU was success' -class information
-            }
-            catch {
+            } catch {
                 Update-Log -data "Couldn't extract the SSU from the LCU" -class error
                 Update-Log -data $_.Exception.Message -Class Error
                 return 1
@@ -7364,14 +7240,12 @@ Function Invoke-2XXXPreReq {
                 Update-Log -data 'Deleting the staged LCU file...' -class Information
                 Remove-Item -Path $PSScriptRoot\staging\extract_me.cab -Force -ErrorAction stop | Out-Null
                 Update-Log -data 'The source file for the SSU has been Baleeted!' -Class Information
-            }
-            catch {
+            } catch {
                 Update-Log -data 'Could not delete the source package' -Class Error
                 Update-Log -data $_.Exception.Message -Class Error
                 return 1
             }
-        }
-        else {
+        } else {
             Update-Log -data 'The required SSU exists. No need to download' -Class Information
         }
 
@@ -7380,14 +7254,12 @@ Function Invoke-2XXXPreReq {
             Add-WindowsPackage -PackagePath "$PSScriptRoot\updates\Windows 10\2XXX_prereq" -Path $WPFMISMountTextBox.Text -ErrorAction Stop | Out-Null
             Update-Log -data 'SSU applied successfully' -class Information
 
-        }
-        catch {
+        } catch {
             Update-Log -data "Couldn't apply the SSU update" -class error
             Update-Log -data $_.Exception.Message -Class Error
             return 1
         }
-    }
-    else {
+    } else {
         Update-Log -Data "Image doesn't require the prereq SSU" -Class Information
     }
 
@@ -7442,8 +7314,7 @@ Function Invoke-19041Select {
     $reader = (New-Object System.Xml.XmlNodeReader $xaml)
     try {
         $Form = [Windows.Markup.XamlReader]::Load( $reader )
-    }
-    catch {
+    } catch {
         Write-Warning "Unable to parse XML, with error: $($Error[0])`n Ensure that there are NO SelectionChanged or TextChanged properties in your textboxes (PowerShell cannot process them)"
         throw
     }
@@ -7527,8 +7398,7 @@ if ($SkipFreeSpaceCheck -eq $false) {
         Update-Log -data 'Example: .\WimWitch.ps1 -SkipFreeSpaceCheck' -Class Error
         Show-ClosingText
         exit 0
-    }
-    Else
+    } Else
     { Update-Log -Data 'Plenty of HDD space available!' -class Information }
 }
 
@@ -7576,7 +7446,7 @@ $ObjectTypes = @('Language Pack', 'Local Experience Pack', 'Feature On Demand')
 $WinOS = @('Windows Server', 'Windows 10', 'Windows 11')
 $WinSrvVer = @('2019', '21H2')
 $Win10Ver = @('1809', '2004')
-$Win11Ver = @('21H2', '22H2')
+$Win11Ver = @('21H2', '22H2', '23H2')
 
 Foreach ($ObjectType in $ObjectTypes) { $WPFImportOtherCBType.Items.Add($ObjectType) | Out-Null }
 Foreach ($WinOS in $WinOS) { $WPFImportOtherCBWinOS.Items.Add($WinOS) | Out-Null }
@@ -7609,8 +7479,7 @@ if ((Find-ConfigManager) -eq 0) {
         $WPFUSCBSelectCatalogSource.SelectedIndex = 2
         Invoke-UpdateTabOptions
     }
-}
-else
+} else
 { Update-Log -Data 'Skipping ConfigMgr PowerShell module importation' }
 
 #Set OSDSUS to Patch Catalog if CM isn't integratedg
@@ -7785,7 +7654,26 @@ if ($DownloadUpdates -eq $true) {
                 Invoke-MEMCMUpdatecatalog -prod 'Windows 11' -Ver 21H2
             }
         }
-
+        if ($Win11Version -eq '22H2') {
+            if ($WPFUSCBSelectCatalogSource.SelectedIndex -eq 1) {
+                Test-Superceded -action delete -OS 'Windows 11' -Build 22H2
+                Get-WindowsPatches -OS 'Windows 11' -build 22H2
+            }
+            if ($WPFUSCBSelectCatalogSource.SelectedIndex -eq 2) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 11' -Ver 22H2
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 11' -Ver 22H2
+            }
+        }
+        if ($Win11Version -eq '23H2') {
+            if ($WPFUSCBSelectCatalogSource.SelectedIndex -eq 1) {
+                Test-Superceded -action delete -OS 'Windows 11' -Build 23H2
+                Get-WindowsPatches -OS 'Windows 11' -build 23H2
+            }
+            if ($WPFUSCBSelectCatalogSource.SelectedIndex -eq 2) {
+                Invoke-MEMCMUpdateSupersedence -prod 'Windows 11' -Ver 23H2
+                Invoke-MEMCMUpdatecatalog -prod 'Windows 11' -Ver 23H2
+            }
+        }
 
         Get-OneDrive
     }
@@ -7885,8 +7773,7 @@ $WPFImportOtherBSelectPath.add_click({ Select-ImportOtherPath
 $WPFImportOtherBImport.add_click({
         if ($WPFImportOtherCBWinOS.SelectedItem -eq 'Windows Server') {
             if ($WPFImportOtherCBWinVer.SelectedItem -eq '2019') { $WinVerConversion = '1809' }
-        }
-        else {
+        } else {
             $WinVerConversion = $WPFImportOtherCBWinVer.SelectedItem
         }
 
@@ -7919,8 +7806,7 @@ $WPFCMBSelectImage.Add_Click({
         if ((Test-Path -Path $path ) -eq $True) {
             # write-host "True"
             Get-Configuration -filename $path
-        }
-        else {
+        } else {
             Get-ImageInfo -PackID $image.PackageID
         }
     })
@@ -8018,8 +7904,7 @@ $WPFJSONEnableCheckBox.Add_Click( {
         If ($WPFJSONEnableCheckBox.IsChecked -eq $true) {
             $WPFJSONButton.IsEnabled = $True
             $WPFMISJSONTextBox.Text = 'True'
-        }
-        else {
+        } else {
             $WPFJSONButton.IsEnabled = $False
             $WPFMISJSONTextBox.Text = 'False'
         }
@@ -8034,8 +7919,7 @@ $WPFDriverCheckBox.Add_Click( {
             $WPFDriverDir4Button.IsEnabled = $True
             $WPFDriverDir5Button.IsEnabled = $True
             $WPFMISDriverTextBox.Text = 'True'
-        }
-        else {
+        } else {
             $WPFDriverDir1Button.IsEnabled = $False
             $WPFDriverDir2Button.IsEnabled = $False
             $WPFDriverDir3Button.IsEnabled = $False
@@ -8049,8 +7933,7 @@ $WPFDriverCheckBox.Add_Click( {
 $WPFUpdatesEnableCheckBox.Add_Click( {
         If ($WPFUpdatesEnableCheckBox.IsChecked -eq $true) {
             $WPFMISUpdatesTextBox.Text = 'True'
-        }
-        else {
+        } else {
             $WPFMISUpdatesTextBox.Text = 'False'
         }
     })
@@ -8060,8 +7943,7 @@ $WPFAppxCheckBox.Add_Click( {
         If ($WPFAppxCheckBox.IsChecked -eq $true) {
             $WPFAppxButton.IsEnabled = $True
             $WPFMISAppxTextBox.Text = 'True'
-        }
-        else {
+        } else {
             $WPFAppxButton.IsEnabled = $False
         }
     })
@@ -8071,8 +7953,7 @@ $WPFImportWIMCheckBox.Add_Click( {
         If ($WPFImportWIMCheckBox.IsChecked -eq $true) {
             $WPFImportNewNameTextBox.IsEnabled = $True
             $WPFImportImportButton.IsEnabled = $True
-        }
-        else {
+        } else {
             $WPFImportNewNameTextBox.IsEnabled = $False
             if ($WPFImportDotNetCheckBox.IsChecked -eq $False) { $WPFImportImportButton.IsEnabled = $False }
         }
@@ -8082,8 +7963,7 @@ $WPFImportWIMCheckBox.Add_Click( {
 $WPFImportDotNetCheckBox.Add_Click( {
         If ($WPFImportDotNetCheckBox.IsChecked -eq $true) {
             $WPFImportImportButton.IsEnabled = $True
-        }
-        else {
+        } else {
             if ($WPFImportWIMCheckBox.IsChecked -eq $False) { $WPFImportImportButton.IsEnabled = $False }
         }
     })
@@ -8101,8 +7981,7 @@ $WPFUpdatesW10Main.Add_Click( {
             $WPFUpdatesW10_21H1.IsEnabled = $True
             $WPFUpdatesW10_21H2.IsEnabled = $True
             $WPFUpdatesW10_22H2.IsEnabled = $True
-        }
-        else {
+        } else {
             #$WPFUpdatesW10_1909.IsEnabled = $False
             $WPFUpdatesW10_1903.IsEnabled = $False
             $WPFUpdatesW10_1809.IsEnabled = $False
@@ -8121,10 +8000,11 @@ $WPFUpdatesW11Main.Add_Click( {
         If ($WPFUpdatesW11Main.IsChecked -eq $true) {
             $WPFUpdatesW11_21H2.IsEnabled = $True
             $WPFUpdatesW11_22H2.IsEnabled = $True
-        }
-        else {
+            $WPFUpdatesW11_23H2.IsEnabled = $True
+        } else {
             $WPFUpdatesW11_21H2.IsEnabled = $False
             $WPFUpdatesW11_22H2.IsEnabled = $False
+            $WPFUpdatesW11_23H2.IsEnabled = $False
 
         }
     })
@@ -8134,8 +8014,7 @@ $WPFCustomCBLangPacks.Add_Click({
         If ($WPFCustomCBLangPacks.IsChecked -eq $true) {
             $WPFCustomBLangPacksSelect.IsEnabled = $True
             $WPFCustomBLangPacksRemove.IsEnabled = $True
-        }
-        else {
+        } else {
             $WPFCustomBLangPacksSelect.IsEnabled = $False
             $WPFCustomBLangPacksRemove.IsEnabled = $False
         }
@@ -8146,8 +8025,7 @@ $WPFCustomCBLEP.Add_Click({
         If ($WPFCustomCBLEP.IsChecked -eq $true) {
             $WPFCustomBLEPSelect.IsEnabled = $True
             $WPFCustomBLEPSRemove.IsEnabled = $True
-        }
-        else {
+        } else {
             $WPFCustomBLEPSelect.IsEnabled = $False
             $WPFCustomBLEPSRemove.IsEnabled = $False
         }
@@ -8158,8 +8036,7 @@ $WPFCustomCBFOD.Add_Click({
         If ($WPFCustomCBFOD.IsChecked -eq $true) {
             $WPFCustomBFODSelect.IsEnabled = $True
             $WPFCustomBFODRemove.IsEnabled = $True
-        }
-        else {
+        } else {
             $WPFCustomBFODSelect.IsEnabled = $False
             $WPFCustomBFODRemove.IsEnabled = $False
         }
@@ -8172,8 +8049,7 @@ $WPFCustomCBRunScript.Add_Click({
             $WPFCustomBSelectPath.IsEnabled = $True
             $WPFCustomTBParameters.IsEnabled = $True
             $WPFCustomCBScriptTiming.IsEnabled = $True
-        }
-        else {
+        } else {
             $WPFCustomTBFile.IsEnabled = $False
             $WPFCustomBSelectPath.IsEnabled = $False
             $WPFCustomTBParameters.IsEnabled = $False
@@ -8185,8 +8061,7 @@ $WPFCustomCBEnableApp.Add_Click({
         If ($WPFCustomCBEnableApp.IsChecked -eq $true) {
             $WPFCustomBDefaultApp.IsEnabled = $True
 
-        }
-        else {
+        } else {
             $WPFCustomBDefaultApp.IsEnabled = $False
         }
     })
@@ -8196,8 +8071,7 @@ $WPFCustomCBEnableStart.Add_Click({
         If ($WPFCustomCBEnableStart.IsChecked -eq $true) {
             $WPFCustomBStartMenu.IsEnabled = $True
 
-        }
-        else {
+        } else {
             $WPFCustomBStartMenu.IsEnabled = $False
         }
     })
@@ -8209,8 +8083,7 @@ $WPFCustomCBEnableRegistry.Add_Click({
             $WPFCustomBRegistryRemove.IsEnabled = $True
             $WPFCustomLBRegistry.IsEnabled = $True
 
-        }
-        else {
+        } else {
             $WPFCustomBRegistryAdd.IsEnabled = $False
             $WPFCustomBRegistryRemove.IsEnabled = $False
             $WPFCustomLBRegistry.IsEnabled = $False
@@ -8222,8 +8095,7 @@ $WPFCustomCBEnableRegistry.Add_Click({
 $WPFImportISOCheckBox.Add_Click( {
         If ($WPFImportISOCheckBox.IsChecked -eq $true) {
             $WPFImportImportButton.IsEnabled = $True
-        }
-        else {
+        } else {
             if (($WPFImportWIMCheckBox.IsChecked -eq $False) -and ($WPFImportDotNetCheckBox.IsChecked -eq $False)) { $WPFImportImportButton.IsEnabled = $False }
         }
     })
@@ -8236,8 +8108,7 @@ $WPFMISCBNoWIM.Add_Click( {
             $WPFMISFolderButton.IsEnabled = $False
 
             $WPFMISWimNameTextBox.text = 'install.wim'
-        }
-        else {
+        } else {
             $WPFMISWimNameTextBox.IsEnabled = $True
             $WPFMISWimFolderTextBox.IsEnabled = $True
             $WPFMISFolderButton.IsEnabled = $True
@@ -8254,8 +8125,7 @@ $WPFMISCBISO.Add_Click( {
             $WPFMISCBBootWIM.IsEnabled = $True
             $WPFMISISOSelectButton.IsEnabled = $true
 
-        }
-        else {
+        } else {
             $WPFMISTBISOFileName.IsEnabled = $False
             $WPFMISTBFilePath.IsEnabled = $False
             $WPFMISISOSelectButton.IsEnabled = $false
@@ -8282,8 +8152,7 @@ $WPFMISCBUpgradePackage.Add_Click( {
             $WPFMISCBNoWIM.IsEnabled = $True
             $WPFMISCBBootWIM.IsEnabled = $True
 
-        }
-        else {
+        } else {
             $WPFMISTBUpgradePackage.IsEnabled = $False
         }
         if (($WPFMISCBISO.IsChecked -eq $false) -and ($WPFMISCBUpgradePackage.IsChecked -eq $false)) {
