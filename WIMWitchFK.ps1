@@ -2688,17 +2688,17 @@ Function Test-Install {
 }
 
 Function Set-Version($wimversion) {
-    if ($wimversion -like '10.0.16299.*') { $version = '1709' }
-    if ($wimversion -like '10.0.17134.*') { $version = '1803' }
-    if ($wimversion -like '10.0.17763.*') { $version = '1809' }
-    if ($wimversion -like '10.0.18362.*') { $version = '1909' }
-    if ($wimversion -like '10.0.14393.*') { $version = '1607' }
-    if ($wimversion -like '10.0.19041.*') { $version = '2004' }
-    if ($wimversion -like '10.0.22000.*') { $version = '21H2' }
-    if ($wimversion -like '10.0.20348.*') { $version = '21H2' }
-    if ($wimversion -like '10.0.22621.*') { $version = '22H2' }
-
-
+    if ($wimversion -like '10.0.22621.24*') { $version = '23H2' }
+    elseif ($wimversion -like '10.0.16299.*') { $version = '1709' }
+    elseif ($wimversion -like '10.0.17134.*') { $version = '1803' }
+    elseif ($wimversion -like '10.0.17763.*') { $version = '1809' }
+    elseif ($wimversion -like '10.0.18362.*') { $version = '1909' }
+    elseif ($wimversion -like '10.0.14393.*') { $version = '1607' }
+    elseif ($wimversion -like '10.0.19041.*') { $version = '2004' }
+    elseif ($wimversion -like '10.0.22000.*') { $version = '21H2' }
+    elseif ($wimversion -like '10.0.20348.*') { $version = '21H2' }
+    elseif ($wimversion -like '10.0.22621.*') { $version = '22H2' }
+    else { $version = 'Unknown' }
     return $version
 }
 
