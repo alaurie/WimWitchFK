@@ -1,4 +1,4 @@
-﻿<#PSScriptInfo
+<#PSScriptInfo
 
 .VERSION 3.4.8
 
@@ -2688,7 +2688,7 @@ Function Test-Install {
 }
 
 Function Set-Version($wimversion) {
-    if ($wimversion -like '10.0.22621.24*') { $version = '23H2' }
+    if (($wimversion -eq '10.0.22621.2428') -or ($wimversion -like '10.0.22631.*')) { $version = '23H2' }
     elseif ($wimversion -like '10.0.16299.*') { $version = '1709' }
     elseif ($wimversion -like '10.0.17134.*') { $version = '1803' }
     elseif ($wimversion -like '10.0.17763.*') { $version = '1809' }
@@ -6476,7 +6476,9 @@ Function Get-WinVersionNumber {
     If ($WPFSourceWimVerTextBox.text -like '10.0.19043.*') { $buildnum = '21H1' }
     If ($WPFSourceWimVerTextBox.text -like '10.0.19044.*') { $buildnum = '21H2' }
     If ($WPFSourceWimVerTextBox.text -like '10.0.22621.*') { $buildnum = '22H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.22621.24*') { $buildnum = '23H2' }
+    If ($WPFSourceWimVerTextBox.text -like '10.0.22621.2428') { $buildnum = '23H2' }
+    If ($WPFSourceWimVerTextBox.text -like '10.0.22631.*') { $buildnum = '23H2' }
+
 
     If ($WPFSourceWimVerTextBox.text -like '10.0.19041.*') {
         $IsMountPoint = $False
