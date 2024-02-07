@@ -1,4 +1,4 @@
-<#PSScriptInfo
+﻿<#PSScriptInfo
 
 .VERSION 3.4.8
 
@@ -36,6 +36,12 @@
  Image (WIM) files and ISOs. It can also create WIM configuration templates and
  apply them either with the GUI or programatically for bulk creation. WIM Witch
  works as a stand alone tool, as well as integrating with Configuration Manager
+
+-version 3.4.9
+Resolved wrong ascii character causing curly bracket imbalance on line 6991. Fix from @chadkerley
+Resolved issue with running wimwitch from command line. Fix from @THH-THC
+    Line 2402 changed to: Update-Log -Data $WWScriptVer
+    Line 2403 added: Invoke-MakeItSo -appx $global:SelectedAppx 
 
 -version 3.4.8
 Added appx removal for Windows 11 23H2 and added new Microsoft Backup to the list of apps to remove.
@@ -2399,7 +2405,8 @@ Function Reset-MISCheckBox {
 Function Invoke-RunConfigFile($filename) {
     Update-Log -Data "Loading the config file: $filename" -Class Information
     Get-Configuration -filename $filename
-    Update-Log -Datversion $WWScriptVer
+    Update-Log -Data $WWScriptVer
+    Invoke-MakeItSo -appx $global:SelectedAppx
     Write-Output ' '
     Write-Output '##########################################################'
     Write-Output ' '
