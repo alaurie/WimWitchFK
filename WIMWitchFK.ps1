@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 3.4.8
+.VERSION 3.4.9
 
 .GUID ee1ba506-ac68-45f8-9f37-4555f1902353
 
@@ -42,6 +42,7 @@ Resolved wrong ascii character causing curly bracket imbalance on line 6991. Fix
 Resolved issue with running wimwitch from command line. Fix from @THH-THC
     Line 2402 changed to: Update-Log -Data $WWScriptVer
     Line 2403 added: Invoke-MakeItSo -appx $global:SelectedAppx 
+Resolved issue with update directories not being correctly parsed when processing updates.
 
 -version 3.4.8
 Added appx removal for Windows 11 23H2 and added new Microsoft Backup to the list of apps to remove.
