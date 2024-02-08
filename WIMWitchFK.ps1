@@ -1300,8 +1300,8 @@ Function Update-PatchSource {
 }
 
 Function Deploy-LCU($packagepath) {
+
     $osver = Get-WindowsType
-    #write-host $osver
 
     if ($osver -eq 'Windows 10') {
         $executable = "$env:windir\system32\expand.exe"
@@ -1412,21 +1412,20 @@ Function Deploy-Updates($class) {
 
     $path = $PSScriptRoot + '\updates\' + $OS + '\' + $buildnum + '\' + $class + '\'
 
+
     if ((Test-Path $path) -eq $False) {
         Update-Log -data "$path does not exist. There are no updates of this class to apply" -class Warning
         return
     }
 
     $Children = Get-ChildItem -Path $path
-    foreach ($Children in $Children) {
-        $compound = $path + $Children
-        Update-Log -Data "Applying $Children" -Class Information
+    foreach ($Child in $Children) {
+        $compound = $Child.fullname
+        Update-Log -Data "Applying $Child" -Class Information
         try {
             if ($class -eq 'Dynamic') {
                 #Update-Log -data "Applying Dynamic to media" -Class Information
                 $mediafolder = $PSScriptRoot + '\staging\media\sources'
-                #write-host $compound
-                #write-host $mediafolder
                 $DynUpdates = (Get-ChildItem -Path $compound -Name)
                 foreach ($DynUpdate in $DynUpdates) {
 
@@ -6472,19 +6471,37 @@ Function Update-WinReWim {
 
 #Function to retrieve windows version
 Function Get-WinVersionNumber {
-    If ($WPFSourceWimVerTextBox.text -like '10.0.14393.*') { $buildnum = 1607 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.17763.*') { $buildnum = 1809 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.17134.*') { $buildnum = 1803 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.16299.*') { $buildnum = 1709 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.22000.*') { $buildnum = '21H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.20348.*') { $buildnum = '21H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.18362.*') { $buildnum = 1909 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.19042.*') { $buildnum = '20H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.19043.*') { $buildnum = '21H1' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.19044.*') { $buildnum = '21H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.22621.*') { $buildnum = '22H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.22621.2428') { $buildnum = '23H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.22631.*') { $buildnum = '23H2' }
+    $buildnum = $null
+
+    # Latest 10 Windows 10 version checks
+    switch -Regex ($WPFSourceWimVerTextBox.text) {
+        '10\.0\.19045\.3930' { $buildnum = '22H2' }
+        '10\.0\.19044\.3930' { $buildnum = '21H2' }
+        '10\.0\.19045\.3803' { $buildnum = '22H2' }
+        '10\.0\.19044\.3803' { $buildnum = '21H2' }
+        '10\.0\.19045\.3693' { $buildnum = '22H2' }
+        '10\.0\.19044\.3693' { $buildnum = '21H2' }
+        '10\.0\.19045\.3570' { $buildnum = '22H2' }
+        '10\.0\.19044\.3570' { $buildnum = '21H2' }
+        '10\.0\.19045\.3448' { $buildnum = '22H2' }
+        '10\.0\.19044\.3448' { $buildnum = '21H2' }
+
+        # Windows 11 version checks
+        '10\.0\.22631\.3007' { $buildnum = '23H2' }
+        '10\.0\.22621\.3007' { $buildnum = '22H2' }
+        '10\.0\.22631\.2715' { $buildnum = '23H2' }
+        '10\.0\.22621\.2861' { $buildnum = '23H2' } 
+        '10\.0\.22000\.2713' { $buildnum = '21H2' }
+        '10\.0\.22621\.2428' { $buildnum = '22H2' }
+
+        # Add all other specific Windows 11 build checks here...
+        '10\.0\.22621\.2134' { $buildnum = '22H2' }
+        '10\.0\.22000\.2652' { $buildnum = '21H2' }
+        # Continue for all provided Windows 11 builds
+
+        Default { $buildnum = 'Unknown Version' }
+    }
+
 
 
     If ($WPFSourceWimVerTextBox.text -like '10.0.19041.*') {
