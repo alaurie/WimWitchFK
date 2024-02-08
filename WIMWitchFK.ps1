@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 3.4.8
+.VERSION 3.4.9
 
 .GUID ee1ba506-ac68-45f8-9f37-4555f1902353
 
@@ -36,6 +36,13 @@
  Image (WIM) files and ISOs. It can also create WIM configuration templates and
  apply them either with the GUI or programatically for bulk creation. WIM Witch
  works as a stand alone tool, as well as integrating with Configuration Manager
+
+-version 3.4.9
+Resolved wrong ascii character causing curly bracket imbalance on line 6991. Fix from @chadkerley
+Resolved issue with running wimwitch from command line. Fix from @THH-THC
+    Line 2402 changed to: Update-Log -Data $WWScriptVer
+    Line 2403 added: Invoke-MakeItSo -appx $global:SelectedAppx 
+Resolved issue with update directories not being correctly parsed when processing updates.
 
 -version 3.4.8
 Added appx removal for Windows 11 23H2 and added new Microsoft Backup to the list of apps to remove.
@@ -1294,8 +1301,8 @@ Function Update-PatchSource {
 }
 
 Function Deploy-LCU($packagepath) {
+
     $osver = Get-WindowsType
-    #write-host $osver
 
     if ($osver -eq 'Windows 10') {
         $executable = "$env:windir\system32\expand.exe"
@@ -1406,21 +1413,20 @@ Function Deploy-Updates($class) {
 
     $path = $PSScriptRoot + '\updates\' + $OS + '\' + $buildnum + '\' + $class + '\'
 
+
     if ((Test-Path $path) -eq $False) {
         Update-Log -data "$path does not exist. There are no updates of this class to apply" -class Warning
         return
     }
 
     $Children = Get-ChildItem -Path $path
-    foreach ($Children in $Children) {
-        $compound = $path + $Children
-        Update-Log -Data "Applying $Children" -Class Information
+    foreach ($Child in $Children) {
+        $compound = $Child.fullname
+        Update-Log -Data "Applying $Child" -Class Information
         try {
             if ($class -eq 'Dynamic') {
                 #Update-Log -data "Applying Dynamic to media" -Class Information
                 $mediafolder = $PSScriptRoot + '\staging\media\sources'
-                #write-host $compound
-                #write-host $mediafolder
                 $DynUpdates = (Get-ChildItem -Path $compound -Name)
                 foreach ($DynUpdate in $DynUpdates) {
 
@@ -2399,7 +2405,8 @@ Function Reset-MISCheckBox {
 Function Invoke-RunConfigFile($filename) {
     Update-Log -Data "Loading the config file: $filename" -Class Information
     Get-Configuration -filename $filename
-    Update-Log -Datversion $WWScriptVer
+    Update-Log -Data $WWScriptVer
+    Invoke-MakeItSo -appx $global:SelectedAppx
     Write-Output ' '
     Write-Output '##########################################################'
     Write-Output ' '
@@ -2688,7 +2695,7 @@ Function Test-Install {
 }
 
 Function Set-Version($wimversion) {
-    if ($wimversion -like '10.0.22621.24*') { $version = '23H2' }
+    if (($wimversion -eq '10.0.22621.2428') -or ($wimversion -like '10.0.22631.*')) { $version = '23H2' }
     elseif ($wimversion -like '10.0.16299.*') { $version = '1709' }
     elseif ($wimversion -like '10.0.17134.*') { $version = '1803' }
     elseif ($wimversion -like '10.0.17763.*') { $version = '1809' }
@@ -6465,18 +6472,38 @@ Function Update-WinReWim {
 
 #Function to retrieve windows version
 Function Get-WinVersionNumber {
-    If ($WPFSourceWimVerTextBox.text -like '10.0.14393.*') { $buildnum = 1607 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.17763.*') { $buildnum = 1809 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.17134.*') { $buildnum = 1803 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.16299.*') { $buildnum = 1709 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.22000.*') { $buildnum = '21H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.20348.*') { $buildnum = '21H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.18362.*') { $buildnum = 1909 }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.19042.*') { $buildnum = '20H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.19043.*') { $buildnum = '21H1' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.19044.*') { $buildnum = '21H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.22621.*') { $buildnum = '22H2' }
-    If ($WPFSourceWimVerTextBox.text -like '10.0.22621.24*') { $buildnum = '23H2' }
+    $buildnum = $null
+
+    # Latest 10 Windows 10 version checks
+    switch -Regex ($WPFSourceWimVerTextBox.text) {
+        '10\.0\.19045\.3930' { $buildnum = '22H2' }
+        '10\.0\.19044\.3930' { $buildnum = '21H2' }
+        '10\.0\.19045\.3803' { $buildnum = '22H2' }
+        '10\.0\.19044\.3803' { $buildnum = '21H2' }
+        '10\.0\.19045\.3693' { $buildnum = '22H2' }
+        '10\.0\.19044\.3693' { $buildnum = '21H2' }
+        '10\.0\.19045\.3570' { $buildnum = '22H2' }
+        '10\.0\.19044\.3570' { $buildnum = '21H2' }
+        '10\.0\.19045\.3448' { $buildnum = '22H2' }
+        '10\.0\.19044\.3448' { $buildnum = '21H2' }
+
+        # Windows 11 version checks
+        '10\.0\.22631\.3007' { $buildnum = '23H2' }
+        '10\.0\.22621\.3007' { $buildnum = '22H2' }
+        '10\.0\.22631\.2715' { $buildnum = '23H2' }
+        '10\.0\.22621\.2861' { $buildnum = '23H2' } 
+        '10\.0\.22000\.2713' { $buildnum = '21H2' }
+        '10\.0\.22621\.2428' { $buildnum = '22H2' }
+
+        # Add all other specific Windows 11 build checks here...
+        '10\.0\.22621\.2134' { $buildnum = '22H2' }
+        '10\.0\.22000\.2652' { $buildnum = '21H2' }
+        # Continue for all provided Windows 11 builds
+
+        Default { $buildnum = 'Unknown Version' }
+    }
+
+
 
     If ($WPFSourceWimVerTextBox.text -like '10.0.19041.*') {
         $IsMountPoint = $False
@@ -6987,7 +7014,7 @@ Function Invoke-MakeItSo ($appx) {
         if (!(Test-Path "$PSScriptRoot\Staging" -PathType 'Any')) {
             New-Item -ItemType Directory -Force -Path $PSScriptRoot\Staging -ErrorAction Stop
             Update-Log -Data 'Path did not exist, but it does now' -Class Information -ErrorAction Stop
-        } Else {
+        } else {
             Remove-Item -Path $PSScriptRoot\Staging\* -Recurse -ErrorAction Stop
             Update-Log -Data 'The path existed, and it has been purged.' -Class Information -ErrorAction Stop
         }
