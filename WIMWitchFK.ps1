@@ -7015,7 +7015,7 @@ Function Invoke-MakeItSo ($appx) {
             New-Item -ItemType Directory -Force -Path $PSScriptRoot\Staging -ErrorAction Stop
             Update-Log -Data 'Path did not exist, but it does now' -Class Information -ErrorAction Stop
         } else {
-            Remove-Item –Path $PSScriptRoot\Staging\* -Recurse -ErrorAction Stop
+            Remove-Item -Path $PSScriptRoot\Staging\* -Recurse -ErrorAction Stop
             Update-Log -Data 'The path existed, and it has been purged.' -Class Information -ErrorAction Stop
         }
     } catch {
