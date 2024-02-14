@@ -51,7 +51,7 @@
     # ProcessorArchitecture = ''
 
     # Modules that must be imported into the global environment prior to importing this module
-    RequiredModules   = @(OSDSUS,OSDUpdate)
+    RequiredModules   = @('OSDSUS', 'OSDUpdate')
 
     # Assemblies that must be loaded prior to importing this module
     # RequiredAssemblies = @()
@@ -95,7 +95,7 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags         = @(WIM, Servicing, Deployment, Windows, Imaging, OSD, SCCM, DISM, WIMWitch, WimWitchFK)
+            Tags         = @('WIM', 'Servicing', 'Deployment', 'Windows', 'Imaging', 'OSD', 'SCCM', 'DISM', 'WIMWitch', 'WimWitchFK')
 
             # A URL to the license for this module.
             # LicenseUri = ''
