@@ -6,6 +6,10 @@ This a forked version of WimWitch by TheNotoriusDRR which was EOL'd in Jan 2023.
 
 # Changelog
 
+## 4.0.1
+
+- Resolved issue with default paths in Make It So tab
+
 ## 4.0.0
 
 - Refactored script into a PowerShell module.

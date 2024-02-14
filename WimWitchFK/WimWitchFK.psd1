@@ -12,7 +12,7 @@
     RootModule        = 'WimWitchFK.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '4.0.0'
+    ModuleVersion     = '4.0.1'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -107,7 +107,7 @@
             IconUri      = 'https://i.imgur.com/WGNLA48.png'
 
             # ReleaseNotes of this module
-            ReleaseNotes = ''
+            ReleaseNotes = 'https://github.com/alaurie/WimWitchFK/blob/main/README.md'
 
             # Prerelease string of this module
             # Prerelease = ''

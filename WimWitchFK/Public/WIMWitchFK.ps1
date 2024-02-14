@@ -4,7 +4,7 @@
     #Requires -Version 5.0
     #Requires -Modules OSDSUS, OSDUpdate
     #-- Requires -ShellId <ShellId>
-    #Requires -RunAsAdministrator
+    # Requires -RunAsAdministrator
     #-- Requires -PSSnapin <PSSnapin-Name> [-Version <N>[.<n>]]
 
 
@@ -57,7 +57,7 @@
 
     )
 
-    $WWScriptVer = '3.4.9'
+    $WWScriptVer = '4.0.1'
 
     #region XAML
     #Your XAML goes here
@@ -373,7 +373,7 @@
     $form.Icon = $bitmap
     # This is the toolbar icon and description
     $form.TaskbarItemInfo.Overlay = $bitmap
-    $form.TaskbarItemInfo.Description = "WIM Witch - $wwscirptver"
+    $form.TaskbarItemInfo.Description = "WIM Witch - $wwscriptver"
     ###################################################
 
     #endregion XAML
@@ -384,6 +384,7 @@
     #===========================================================================
 
     # Calls fuction to display the opening text blurb
+
     Show-OpeningText
 
     # Get-FormVariables #lists all WPF variables
@@ -396,8 +397,11 @@
     # Clears out old logs from previous builds and checks for other folders
     Set-Logging
 
+    # Test for admin and exit if not
+    Test-Admin
+
     # Setting default values for the WPF form
-    $WPFMISWimFolderTextBox.Text = "$global:workdir\CompleteWIMs"
+    $WPFMISWimFolderTextBox.Text = "$global:workdir\CompletedWIMs"
     $WPFMISMountTextBox.Text = "$global:workdir\Mount"
     $WPFJSONTextBoxSavePath.Text = "$global:workdir\Autopilot"
 
