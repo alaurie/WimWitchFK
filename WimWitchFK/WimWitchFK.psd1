@@ -51,7 +51,7 @@
     # ProcessorArchitecture = ''
 
     # Modules that must be imported into the global environment prior to importing this module
-    RequiredModules   = @(Get-OSDSUS,OSDUpdate)
+    RequiredModules   = @(OSDSUS,OSDUpdate)
 
     # Assemblies that must be loaded prior to importing this module
     # RequiredAssemblies = @()
