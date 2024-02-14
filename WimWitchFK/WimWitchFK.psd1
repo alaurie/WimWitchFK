@@ -12,7 +12,7 @@
     RootModule        = 'WimWitchFK.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '0.1.0'
+    ModuleVersion     = '4.0.0'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -21,19 +21,19 @@
     GUID              = 'a05358f5-33b8-4963-b5b4-a1fb2ee3ea63'
 
     # Author of this module
-    Author            = 'Alex Laurie'
+    Author            = 'Alex Laurie, Donna Ryan'
 
     # Company or vendor of this module
-    CompanyName       = 'Unknown'
+    CompanyName       = 'N/A'
 
     # Copyright statement for this module
-    Copyright         = '(c) Alex Laurie. All rights reserved.'
+    Copyright         = '(c) Alex Laurie, Donna Ryan All rights reserved.'
 
     # Description of the functionality provided by this module
     Description       = 'Community Fork of WimWitch'
 
     # Minimum version of the PowerShell engine required by this module
-    # PowerShellVersion = ''
+    PowerShellVersion = '5.1'
 
     # Name of the PowerShell host required by this module
     # PowerShellHostName = ''
@@ -95,13 +95,13 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            # Tags = @()
+            Tags       = @(WIM, Servicing, Deployment, Windows, Imaging, OSD, SCCM, DISM, WIMWitch, WimWitchFK)
 
             # A URL to the license for this module.
             # LicenseUri = ''
 
             # A URL to the main website for this project.
-            # ProjectUri = ''
+            ProjectUri = 'https://github.com/alaurie/WimWitchFK'
 
             # A URL to an icon representing this module.
             # IconUri = ''

@@ -5657,18 +5657,7 @@ Function Invoke-2XXXPreReq {
 #Function to display text notification to end user
 Function Invoke-TextNotification {
     Update-Log -data '*********************************' -class Comment
-    Update-Log -data 'This version brings: ' -class Comment
-    Update-Log -data ' ' -class Comment
-    Update-Log -data 'Support for Windows 10 22H2' -Class Comment
-    Update-Log -data 'Bugfix for Win10 22H2 update selection' -Class Comment
-    Update-Log -data 'Bugfix for Win10 22H2 LP/LXP/FOD selection' -Class comment
-    Update-Log -data 'Fix for Win10 22H2 updates downloading with ConfigMgr' -Class Comment
-    Update-Log -data ' ' -Class Comment
-    Update-Log -data 'If you are servicing Win11 22H2, please validate the' -Class Comment
-    Update-Log -data 'Functionality of OneDrive post imaging. This is a new' -Class Comment
-    Update-Log -data "method from Microsoft and I haven't tested it much" -Class Comment
     Update-Log -data '*********************************' -class Comment
-
 }
 
 #Function to display Windows 10 v2XXX selection pop up
