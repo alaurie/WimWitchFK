@@ -95,19 +95,19 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags       = @(WIM, Servicing, Deployment, Windows, Imaging, OSD, SCCM, DISM, WIMWitch, WimWitchFK)
+            Tags         = @(WIM, Servicing, Deployment, Windows, Imaging, OSD, SCCM, DISM, WIMWitch, WimWitchFK)
 
             # A URL to the license for this module.
             # LicenseUri = ''
 
             # A URL to the main website for this project.
-            ProjectUri = 'https://github.com/alaurie/WimWitchFK'
+            ProjectUri   = 'https://github.com/alaurie/WimWitchFK'
 
             # A URL to an icon representing this module.
-            # IconUri = ''
+            IconUri      = 'https://i.imgur.com/WGNLA48.png'
 
             # ReleaseNotes of this module
-            # ReleaseNotes = ''
+            ReleaseNotes = ''
 
             # Prerelease string of this module
             # Prerelease = ''
