@@ -5342,32 +5342,23 @@ Function Update-WinReWim {
 #Function to retrieve windows version
 Function Get-WinVersionNumber {
     $buildnum = $null
+    $ver = [System.Version]$WPFSourceWimVerTextBox.text
 
     # Latest 10 Windows 10 version checks
-    switch -Regex ($WPFSourceWimVerTextBox.text) {
-        '10\.0\.19045\.3930' { $buildnum = '22H2' }
-        '10\.0\.19044\.3930' { $buildnum = '21H2' }
-        '10\.0\.19045\.3803' { $buildnum = '22H2' }
-        '10\.0\.19044\.3803' { $buildnum = '21H2' }
-        '10\.0\.19045\.3693' { $buildnum = '22H2' }
-        '10\.0\.19044\.3693' { $buildnum = '21H2' }
-        '10\.0\.19045\.3570' { $buildnum = '22H2' }
-        '10\.0\.19044\.3570' { $buildnum = '21H2' }
-        '10\.0\.19045\.3448' { $buildnum = '22H2' }
-        '10\.0\.19044\.3448' { $buildnum = '21H2' }
+    switch ($ver.Build) {
+        #Win10
+        19044 {$buildnum = '21H2'}
+        19045 {$buildnum = '22H2'}
 
-        # Windows 11 version checks
-        '10\.0\.22631\.3007' { $buildnum = '23H2' }
-        '10\.0\.22621\.3007' { $buildnum = '22H2' }
-        '10\.0\.22631\.2715' { $buildnum = '23H2' }
-        '10\.0\.22621\.2861' { $buildnum = '23H2' }
-        '10\.0\.22000\.2713' { $buildnum = '21H2' }
-        '10\.0\.22621\.2428' { $buildnum = '22H2' }
+        #Win11
+        22000 {$buildnum = '21H2'}
+        22621 {$buildnum = '22H2'}
+        22631 {$buildnum = '23H2'}
 
-        # Add all other specific Windows 11 build checks here...
-        '10\.0\.22621\.2134' { $buildnum = '22H2' }
-        '10\.0\.22000\.2652' { $buildnum = '21H2' }
-        # Continue for all provided Windows 11 builds
+        #Server
+        14393 {$buildnum = '1607'}
+        17763 {$buildnum = '1809'}
+        20348 {$buildnum = '21H2'}
 
         Default { $buildnum = 'Unknown Version' }
     }
